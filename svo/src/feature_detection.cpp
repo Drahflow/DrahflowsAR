@@ -16,7 +16,7 @@
 
 #include <svo/feature_detection.h>
 #include <svo/feature.h>
-#include <fast/fast.h>
+#include <svo/fast.h>
 #include <vikit/vision.h>
 
 namespace svo {

@@ -2,7 +2,7 @@
 # user build settings
 
 SET(TRACE TRUE)
-SET(HAVE_G2O FALSE) 
+SET(HAVE_G2O FALSE)
 SET(USE_ROS FALSE) # Set FALSE if you want to build this package without Catkin
 SET(DEBUG_OUTPUT FALSE) # Only relevant if build without ROS
 
@@ -31,7 +31,7 @@ ENDIF()
 
 # Set build flags, set ARM_ARCHITECTURE environment variable on Odroid
 # Set build flags. Set IS_ARM on odroid board as environment variable
-SET(CMAKE_CXX_FLAGS "-march=atom -m32 -ggdb -Wall -D_LINUX -D_REENTRANT -march=native -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unknown-pragmas")
+SET(CMAKE_CXX_FLAGS "-L/usr/lib/gcc/i686-linux-gnu/6/ -B/usr/lib/gcc/i686-linux-gnu/6/ -march=atom -m32 -ggdb -Wall -D_LINUX -D_REENTRANT -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unknown-pragmas")
 IF(DEFINED ENV{ARM_ARCHITECTURE})
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon -march=armv7-a")
 ELSE()
@@ -44,25 +44,13 @@ ELSE()
 ENDIF()
 SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops")
 
-# Add plain cmake packages 
+# Add plain cmake packages
 FIND_PACKAGE(Eigen REQUIRED)
 FIND_PACKAGE(Sophus REQUIRED)
-FIND_PACKAGE(fast REQUIRED)
 FIND_PACKAGE(Boost REQUIRED COMPONENTS thread system)
 
-IF(USE_ROS)
-  FIND_PACKAGE(catkin REQUIRED COMPONENTS roscpp roslib cmake_modules vikit_common vikit_ros)
-  catkin_package(
-      DEPENDS Eigen Sophus Boost fast
-      CATKIN_DEPENDS roscpp roslib vikit_common vikit_ros
-      INCLUDE_DIRS include
-      LIBRARIES svo
-  )
-ELSE()
-  FIND_PACKAGE(vikit_common REQUIRED)
-  SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-  SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
-ENDIF()
+SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 # Include dirs
 INCLUDE_DIRECTORIES(
@@ -70,23 +58,13 @@ INCLUDE_DIRECTORIES(
   ${Eigen_INCLUDE_DIRS}
   ${Sophus_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
-  ${fast_INCLUDE_DIRS}
 )
 
 # Set link libraries
-LIST(APPEND LINK_LIBS 
+LIST(APPEND LINK_LIBS
   ${Sophus_LIBRARIES}
   ${Boost_LIBRARIES}
-  ${fast_LIBRARIES}
 )
-
-IF(USE_ROS)
-  INCLUDE_DIRECTORIES(${catkin_INCLUDE_DIRS})
-  LIST(APPEND LINK_LIBS ${catkin_LIBRARIES})
-ELSE()
-  INCLUDE_DIRECTORIES(${vikit_common_INCLUDE_DIRS})
-  LIST(APPEND LINK_LIBS ${vikit_common_LIBRARIES})
-ENDIF()
 
 # Set sourcefiles
 LIST(APPEND SOURCEFILES
@@ -126,23 +104,23 @@ TARGET_LINK_LIBRARIES(svo ${LINK_LIBS})
 ################################################################################
 # TESTS
 
-ADD_EXECUTABLE(test_feature_align test/test_feature_alignment.cpp)
-TARGET_LINK_LIBRARIES(test_feature_align svo)
+# ADD_EXECUTABLE(test_feature_align test/test_feature_alignment.cpp)
+# TARGET_LINK_LIBRARIES(test_feature_align svo)
 
 ADD_EXECUTABLE(test_pipeline test/test_pipeline.cpp)
 TARGET_LINK_LIBRARIES(test_pipeline svo)
 
-ADD_EXECUTABLE(test_matcher test/test_matcher.cpp)
-TARGET_LINK_LIBRARIES(test_matcher svo)
-
-ADD_EXECUTABLE(test_feature_detection test/test_feature_detection.cpp)
-TARGET_LINK_LIBRARIES(test_feature_detection svo)
-
-ADD_EXECUTABLE(test_depth_filter test/test_depth_filter.cpp)
-TARGET_LINK_LIBRARIES(test_depth_filter svo)
-
-ADD_EXECUTABLE(test_sparse_img_align test/test_sparse_img_align.cpp)
-TARGET_LINK_LIBRARIES(test_sparse_img_align svo)
-
-ADD_EXECUTABLE(test_pose_optimizer test/test_pose_optimizer.cpp)
-TARGET_LINK_LIBRARIES(test_pose_optimizer svo) 
+# ADD_EXECUTABLE(test_matcher test/test_matcher.cpp)
+# TARGET_LINK_LIBRARIES(test_matcher svo)
+#
+# ADD_EXECUTABLE(test_feature_detection test/test_feature_detection.cpp)
+# TARGET_LINK_LIBRARIES(test_feature_detection svo)
+#
+# ADD_EXECUTABLE(test_depth_filter test/test_depth_filter.cpp)
+# TARGET_LINK_LIBRARIES(test_depth_filter svo)
+#
+# ADD_EXECUTABLE(test_sparse_img_align test/test_sparse_img_align.cpp)
+# TARGET_LINK_LIBRARIES(test_sparse_img_align svo)
+#
+# ADD_EXECUTABLE(test_pose_optimizer test/test_pose_optimizer.cpp)
+# TARGET_LINK_LIBRARIES(test_pose_optimizer svo)
