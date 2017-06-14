@@ -28,6 +28,8 @@ using namespace std;
 
 struct HomographyDecomposition
 {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   Vector3d t;
   Matrix3d R;
   double   d;
@@ -74,7 +76,7 @@ public:
   vector<bool> inliers;
   SE3d T_c2_from_c1;             //!< Relative translation and rotation of two images
   Matrix3d H_c2_from_c1;                   //!< Homography
-  vector<HomographyDecomposition> decompositions;
+  vector<HomographyDecomposition, aligned_allocator<HomographyDecomposition>> decompositions;
 };
 
 

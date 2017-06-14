@@ -46,7 +46,6 @@ SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -
 
 # Add plain cmake packages
 FIND_PACKAGE(Eigen REQUIRED)
-FIND_PACKAGE(Sophus REQUIRED)
 FIND_PACKAGE(Boost REQUIRED COMPONENTS thread system)
 
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
@@ -56,14 +55,13 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 INCLUDE_DIRECTORIES(
   include
   ${Eigen_INCLUDE_DIRS}
-  ${Sophus_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
 )
 
 # Set link libraries
 LIST(APPEND LINK_LIBS
-  ${Sophus_LIBRARIES}
   ${Boost_LIBRARIES}
+  jpeg png
 )
 
 # Set sourcefiles
@@ -81,7 +79,65 @@ LIST(APPEND SOURCEFILES
   src/feature_detection.cpp
   src/depth_filter.cpp
   src/config.cpp
-  src/sparse_img_align.cpp)
+  src/sparse_img_align.cpp
+  src/faster_corner_10_sse.cpp
+  src/fast_10.cpp
+  src/fast_10_score.cpp
+  src/nonmax_3x3.cpp
+  src/vikit/pinhole_camera.cpp
+  src/vikit/robust_cost.cpp
+  src/vikit/performance_monitor.cpp
+  src/vikit/homography.cpp
+  src/vikit/vision.cpp
+  src/vikit/math_utils.cpp
+  src/opencv/core/stl.cpp
+  src/opencv/core/alloc.cpp
+  src/opencv/core/matrix.cpp
+  src/opencv/core/umatrix.cpp
+  src/opencv/core/system.cpp
+  src/opencv/core/copy.cpp
+  src/opencv/core/array.cpp
+  src/opencv/core/datastructs.cpp
+  src/opencv/core/persistence.cpp
+  src/opencv/core/convert.cpp
+  src/opencv/core/matop.cpp
+  src/opencv/core/stat.cpp
+  src/opencv/core/arithm.cpp
+  src/opencv/core/lapack.cpp
+  src/opencv/core/matmul.cpp
+  src/opencv/core/parallel.cpp
+  src/opencv/core/hal_internal.cpp
+  src/opencv/core/matrix_decomp.cpp
+  src/opencv/core/merge.cpp
+  src/opencv/core/kmeans.cpp
+  src/opencv/core/split.cpp
+  src/opencv/core/mathfuncs.cpp
+  src/opencv/core/tables.cpp
+  src/opencv/core/algorithm.cpp
+  src/opencv/core/pca.cpp
+  src/opencv/core/out.cpp
+  src/opencv/core/rand.cpp
+  src/opencv/imgproc/undistort.cpp
+  src/opencv/imgproc/imgwarp.cpp
+  src/opencv/imgproc/pyramids.cpp
+  src/opencv/imgproc/shapedescr.cpp
+  src/opencv/imgproc/utils.cpp
+  src/opencv/imgproc/color.cpp
+  src/opencv/imgproc/demosaicing.cpp
+  src/opencv/imgproc/tables.cpp
+  src/opencv/calib3d/fundam.cpp
+  src/opencv/calib3d/rho.cpp
+  src/opencv/calib3d/ptsetreg.cpp
+  src/opencv/calib3d/levmarq.cpp
+  src/opencv/video/lkpyramid.cpp
+  src/opencv/imgcodecs/loadsave.cpp
+  src/opencv/imgcodecs/exif.cpp
+  src/opencv/imgcodecs/grfmt_base.cpp
+  src/opencv/imgcodecs/grfmt_jpeg.cpp
+  src/opencv/imgcodecs/grfmt_jpeg2000.cpp
+  src/opencv/imgcodecs/grfmt_png.cpp
+  src/opencv/imgcodecs/utils.cpp
+  )
 
 # Add g2o if available
 IF(HAVE_G2O)

@@ -26,7 +26,6 @@
 #include <vikit/atan_camera.h>
 #include <vikit/pinhole_camera.h>
 #include <opencv2/opencv.hpp>
-#include <sophus/se3.h>
 #include <iostream>
 #include "test_utils.h"
 
