@@ -15,6 +15,8 @@ SET(CMAKE_BUILD_TYPE Release) # Release, RelWithDebInfo
 SET(CMAKE_VERBOSE_MAKEFILE OFF)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
+SET(CMAKE_CXX_COMPILER "${PROJECT_SOURCE_DIR}/toolchain/bin/i686-linux-android-g++")
+
 # Set definitions
 IF(TRACE)
   ADD_DEFINITIONS(-DSVO_TRACE)
@@ -31,7 +33,7 @@ ENDIF()
 
 # Set build flags, set ARM_ARCHITECTURE environment variable on Odroid
 # Set build flags. Set IS_ARM on odroid board as environment variable
-SET(CMAKE_CXX_FLAGS "-L/usr/lib/gcc/i686-linux-gnu/6/ -B/usr/lib/gcc/i686-linux-gnu/6/ -march=atom -m32 -ggdb -Wall -D_LINUX -D_REENTRANT -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unknown-pragmas")
+SET(CMAKE_CXX_FLAGS "-march=atom -m32 -ggdb -Wall -D_LINUX -D_REENTRANT -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unknown-pragmas")
 IF(DEFINED ENV{ARM_ARCHITECTURE})
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon -march=armv7-a")
 ELSE()
@@ -42,11 +44,11 @@ IF(CMAKE_COMPILER_IS_GNUCC)
 ELSE()
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 ENDIF()
-SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops")
+SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops -Wl,--hash-style=both")
 
 # Add plain cmake packages
 FIND_PACKAGE(Eigen REQUIRED)
-FIND_PACKAGE(Boost REQUIRED COMPONENTS thread system)
+# FIND_PACKAGE(Boost REQUIRED COMPONENTS thread system)
 
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
@@ -55,13 +57,15 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 INCLUDE_DIRECTORIES(
   include
   ${Eigen_INCLUDE_DIRS}
-  ${Boost_INCLUDE_DIRS}
+  # ${Boost_INCLUDE_DIRS}
 )
 
 # Set link libraries
 LIST(APPEND LINK_LIBS
-  ${Boost_LIBRARIES}
-  jpeg png
+  # ${Boost_LIBRARIES}
+  # jpeg png
+  android log
+  gnustl_shared
 )
 
 # Set sourcefiles
@@ -133,10 +137,13 @@ LIST(APPEND SOURCEFILES
   src/opencv/imgcodecs/loadsave.cpp
   src/opencv/imgcodecs/exif.cpp
   src/opencv/imgcodecs/grfmt_base.cpp
-  src/opencv/imgcodecs/grfmt_jpeg.cpp
-  src/opencv/imgcodecs/grfmt_jpeg2000.cpp
-  src/opencv/imgcodecs/grfmt_png.cpp
+  # src/opencv/imgcodecs/grfmt_jpeg.cpp
+  # src/opencv/imgcodecs/grfmt_jpeg2000.cpp
+  # src/opencv/imgcodecs/grfmt_png.cpp
   src/opencv/imgcodecs/utils.cpp
+  src/boost/system/error_code.cpp
+  src/boost/thread/pthread/thread.cpp
+  src/boost/thread/pthread/once_atomic.cpp
   )
 
 # Add g2o if available

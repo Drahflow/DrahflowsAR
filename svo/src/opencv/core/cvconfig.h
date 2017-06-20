@@ -36,7 +36,7 @@
 #define CV_OVX_RUN(condition, func, ...)
 #define CV_CPU_CALL_FP16(condition, func, ...)
 
-#define HAVE_JPEG
-#define HAVE_PNG
+// #define HAVE_JPEG
+// #define HAVE_PNG
 
 #endif
