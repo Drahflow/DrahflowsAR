@@ -70,24 +70,24 @@ LIST(APPEND LINK_LIBS
 
 # Set sourcefiles
 LIST(APPEND SOURCEFILES
-  src/frame_handler_mono.cpp
-  src/frame_handler_base.cpp
-  src/frame.cpp
-  src/point.cpp
-  src/map.cpp
-  src/pose_optimizer.cpp
-  src/initialization.cpp
-  src/matcher.cpp
-  src/reprojector.cpp
-  src/feature_alignment.cpp
-  src/feature_detection.cpp
-  src/depth_filter.cpp
-  src/config.cpp
-  src/sparse_img_align.cpp
-  src/faster_corner_10_sse.cpp
-  src/fast_10.cpp
-  src/fast_10_score.cpp
-  src/nonmax_3x3.cpp
+  src/svo/frame_handler_mono.cpp
+  src/svo/frame_handler_base.cpp
+  src/svo/frame.cpp
+  src/svo/point.cpp
+  src/svo/map.cpp
+  src/svo/pose_optimizer.cpp
+  src/svo/initialization.cpp
+  src/svo/matcher.cpp
+  src/svo/reprojector.cpp
+  src/svo/feature_alignment.cpp
+  src/svo/feature_detection.cpp
+  src/svo/depth_filter.cpp
+  src/svo/config.cpp
+  src/svo/sparse_img_align.cpp
+  src/svo/faster_corner_10_sse.cpp
+  src/svo/fast_10.cpp
+  src/svo/fast_10_score.cpp
+  src/svo/nonmax_3x3.cpp
   src/vikit/pinhole_camera.cpp
   src/vikit/robust_cost.cpp
   src/vikit/performance_monitor.cpp

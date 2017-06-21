@@ -28,6 +28,8 @@
 #include <svo/bundle_adjustment.h>
 #endif
 
+#include <android/log.h>
+
 namespace svo {
 
 FrameHandlerMono::FrameHandlerMono(vk::AbstractCamera* cam) :
@@ -57,8 +59,10 @@ FrameHandlerMono::~FrameHandlerMono()
 
 void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
 {
-  if(!startFrameProcessingCommon(timestamp))
+  if(!startFrameProcessingCommon(timestamp)) {
+    __android_log_print(ANDROID_LOG_INFO, "Tracker", "Frame skipped.");
     return;
+  }
 
   // some cleanup from last iteration, can't do before because of visualization
   core_kfs_.clear();
@@ -70,6 +74,8 @@ void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
   SVO_STOP_TIMER("pyramid_creation");
 
   // process frame
+  __android_log_print(ANDROID_LOG_INFO, "Tracker", "Stage: %d", stage_);
+
   UpdateResult res = RESULT_FAILURE;
   if(stage_ == STAGE_DEFAULT_FRAME)
     res = processFrame();
@@ -91,8 +97,10 @@ void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
 FrameHandlerMono::UpdateResult FrameHandlerMono::processFirstFrame()
 {
   new_frame_->T_f_w_ = SE3(Matrix3d::Identity(), Vector3d::Zero());
-  if(klt_homography_init_.addFirstFrame(new_frame_) == initialization::FAILURE)
+  if(klt_homography_init_.addFirstFrame(new_frame_) == initialization::FAILURE) {
+    __android_log_print(ANDROID_LOG_INFO, "Tracker", "Frame not suitable as key frame.");
     return RESULT_NO_KEYFRAME;
+  }
   new_frame_->setKeyframe();
   map_.addKeyframe(new_frame_);
   stage_ = STAGE_SECOND_FRAME;
