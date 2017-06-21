@@ -9,6 +9,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := cameratracker
 LOCAL_SRC_FILES := CameraTracker.cpp
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../svo/include
-LOCAL_CPPFLAGS := -std=c++11
+LOCAL_CPPFLAGS := -std=c++11 -fexceptions
 LOCAL_SHARED_LIBRARIES := libsvo
+LOCAL_LDLIBS := -llog
 include $(BUILD_SHARED_LIBRARY)
