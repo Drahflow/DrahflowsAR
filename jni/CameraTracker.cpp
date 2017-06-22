@@ -78,17 +78,17 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
   }
 
   jfloat *transformationData = env->GetFloatArrayElements(transformation, 0);
-	auto pose = frameHandler->lastFrame()->T_f_w_.inverse();
-	auto trans = pose.translation();
-	transformationData[0] = trans[0];
-	transformationData[1] = trans[1];
-	transformationData[2] = trans[2];
-	auto rot = pose.unit_quaternion();
-	transformationData[3] = rot.x();
-	transformationData[4] = rot.y();
-	transformationData[5] = rot.z();
-	transformationData[6] = rot.w();
-	env->ReleaseFloatArrayElements(transformation, transformationData, 0);
+  auto pose = frameHandler->lastFrame()->T_f_w_.inverse();
+  auto trans = pose.translation();
+  transformationData[0] = trans[0];
+  transformationData[1] = trans[1];
+  transformationData[2] = trans[2];
+  auto rot = pose.unit_quaternion();
+  transformationData[3] = rot.x();
+  transformationData[4] = rot.y();
+  transformationData[5] = rot.z();
+  transformationData[6] = rot.w();
+  env->ReleaseFloatArrayElements(transformation, transformationData, 0);
 
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "ID: %d, #Features: %d, took %lf ms",
       frameHandler->lastFrame()->id_,
