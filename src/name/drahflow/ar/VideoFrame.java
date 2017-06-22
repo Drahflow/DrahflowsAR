@@ -14,6 +14,10 @@ public class VideoFrame {
 		return intensities;
 	}
 
+	public void clearIntensities() {
+		intensities = null;
+	}
+
 	public void setTransformation(float[] _transformation) {
 		transformation = _transformation;
 	}

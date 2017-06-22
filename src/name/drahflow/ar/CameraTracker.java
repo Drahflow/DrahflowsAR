@@ -27,6 +27,11 @@ public class CameraTracker {
 
 		long end = System.nanoTime();
 		Log.e("AR", "optimization took: " + (float)(end - start) / 1000000 + " ms");
+		Log.e("AR", "pose: " +
+				String.format("%8.6f,%8.6f,%8.6f @ %8.6f,%8.6f,%8.6f,%8.6f",
+					transformation[0], transformation[1], transformation[2],
+					transformation[3], transformation[4], transformation[5], transformation[6]));
+
   }
 
   static {

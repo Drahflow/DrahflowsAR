@@ -442,13 +442,16 @@ public class DrahflowsAR extends Activity {
 			drawDebugImage(debugWidth, debugHeight, sourceIntensities, null, null);
 		}
 
+		private FloatBuffer tmpBuffer;
 		private void drawDebugImage(int debugWidth, int debugHeight, float[] sourceIntensities, float[] sourceDepths, float[] sourceVariances) {
 			int[] someTexs = new int[1];
 			GLES20.glGenTextures(1, someTexs, 0);
 			int tmpTex = someTexs[0];
 
-			FloatBuffer tmpBuffer = ByteBuffer.allocateDirect(4 * debugWidth * debugHeight * Utils.BYTES_PER_FLOAT)
-					.order(ByteOrder.nativeOrder()).asFloatBuffer();
+			if(tmpBuffer == null) {
+				tmpBuffer = ByteBuffer.allocateDirect(4 * debugWidth * debugHeight * Utils.BYTES_PER_FLOAT)
+						.order(ByteOrder.nativeOrder()).asFloatBuffer();
+			}
 
 			for(int i = 0; i < debugWidth * debugHeight; ++i) {
 				tmpBuffer.put(i * 4, 0.5f);

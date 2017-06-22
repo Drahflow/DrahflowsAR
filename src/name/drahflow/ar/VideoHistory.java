@@ -41,24 +41,12 @@ public class VideoHistory {
 		return frames.get(frames.size() - 1);
 	}
 
-	public VideoFrame getPenultimateFrame() {
-		return frames.get(frames.size() - 2);
-	}
-	
-	public VideoFrame getFirstFrame() {
-		return frames.get(0);
-	}
-
-	public void clear() {
-		frames.clear();
-	}
-
 	public int size() {
 		return frames.size();
 	}
 
-	public VideoFrame getFrame(int i) {
-		return frames.get(i);
+	public void clear() {
+		frames.clear();
 	}
 
 	public void addFrame(SurfaceTexture frame, int frameTextureHandle) {
@@ -120,7 +108,12 @@ public class VideoHistory {
 
 		GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
 
+		if(!frames.isEmpty()) {
+			frames.get(frames.size() - 1).clearIntensities();
+		}
+
 		frames.add(new VideoFrame(width, height, timestamp, intensities));
+
 		Log.e("AR", "Video history size: " + frames.size());
 	}
 
