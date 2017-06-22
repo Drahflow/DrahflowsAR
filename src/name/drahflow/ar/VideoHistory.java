@@ -67,7 +67,12 @@ public class VideoHistory {
 		long timestamp = frame.getTimestamp();
 
 		if(linkedShaderHandle < 0) {
-			linkedShaderHandle = Utils.compileShader(Utils.computeVertexShader(), cameraCopyFragmentShader(),
+			String fragmentShader = cameraCopyFragmentShader();
+			if(width == camera_width && height == camera_height) {
+				fragmentShader = cameraCopyFragmentShaderUnscaled();
+			}
+
+			linkedShaderHandle = Utils.compileShader(Utils.computeVertexShader(), fragmentShader,
 					new String[] {"a_Position", "a_TexCoordinate"});
 
 			positionHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_Position");
@@ -136,6 +141,19 @@ public class VideoHistory {
 			+ "     }\n"
 			+ "   }\n"
 			+ "   gl_FragColor.r = result / " + 3.0f * ((float)(camera_width / width) * (camera_height / height)) + "f;\n"
+			+ "}\n";
+	}
+
+	private String cameraCopyFragmentShaderUnscaled() {
+		return
+		    "#extension GL_OES_EGL_image_external : require\n"
+			+ "precision mediump float;\n"
+			+ "uniform lowp samplerExternalOES u_CameraData;\n"
+			+ "varying vec2 v_TexCoordinate;\n"
+			+ "void main() {\n"
+			+ "   lowp vec4 texel = texture2D(u_CameraData, v_TexCoordinate);\n"
+			+ "   mediump float result = texel.r + texel.g + texel.b;\n"
+			+ "   gl_FragColor.r = result / 3.0f;\n"
 			+ "}\n";
 	}
 

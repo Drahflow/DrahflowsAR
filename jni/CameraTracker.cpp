@@ -16,6 +16,13 @@
 
 #include <android/log.h>
 
+// #define DUMP_IMAGE 1
+#if DUMP_IMAGE
+  #include <sys/types.h>
+  #include <sys/stat.h>
+  #include <fcntl.h>
+#endif
+
 static vk::AbstractCamera *camera;
 static int cameraWidth;
 static int cameraHeight;
@@ -28,7 +35,9 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1prepare
   cameraWidth = width;
   cameraHeight = height;
 
-  camera = new vk::PinholeCamera(width, height, 315.5, 315.5, 376.0, 240.0);
+  camera = new vk::PinholeCamera(width, height,
+      540.5454, 539.3325, 318.0489, 237.989,
+      0.1272545, -0.4216122, -0.0006996348, -0.014160222, 0.61963481);
   frameHandler = new svo::FrameHandlerMono(camera);
   frameHandler->start();
   frameTime = 0;
@@ -47,14 +56,25 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
   for(int i = 0; i < cameraWidth * cameraHeight; ++i) {
     intensitiesBuffer[i] = intensitiesData[i] * 255;
   }
+
+  #if DUMP_IMAGE
+  char nameBuf[128];
+  sprintf(nameBuf, "/sdcard/svo.%04d.raw", (int)(frameTime * 200));
+  int fd = open(nameBuf, O_CREAT | O_TRUNC | O_WRONLY);
+  if(fd > 0) {
+    write(fd, intensitiesBuffer, cameraWidth * cameraHeight);
+    close(fd);
+  }
+  #endif
+
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "INTENSITY: %d",
       static_cast<int>(intensitiesBuffer[1024]));
 
   cv::Mat img(cameraHeight, cameraWidth, CV_8UC1, intensitiesBuffer);
   frameHandler->addImage(img, frameTime += 0.01);
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "ID: %d, #Features: %d, took %lf μs",
+  __android_log_print(ANDROID_LOG_INFO, "Tracker", "ID: %d, #Features: %d, took %lf ms",
       frameHandler->lastFrame()->id_,
       frameHandler->lastNumObservations(),
-      frameHandler->lastProcessingTime());
+      frameHandler->lastProcessingTime() * 1000);
 }

@@ -83,8 +83,8 @@ public class DrahflowsAR extends Activity {
 			throw new RuntimeException("ES2 not supported, this is hopeless");
 		}
 
-		final int width = 128;
-		final int height = 128;
+		final int width = camera_width;
+		final int height = camera_height;
 		cameraState = CAMERA_NOT_AVAILABLE;
 
 		videoHistory = new VideoHistory(width, height, camera_width, camera_height, 30l * 1000l * 1000l * 1000l);

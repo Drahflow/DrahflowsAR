@@ -13,7 +13,8 @@ public class CameraTracker {
     height = _height;
 		history = _history;
 
-		SVO_prepare(width, height, 315.5f, 315.5f, 376.0, 240.0);
+		// TODO: drop (or forward) unused calibration parameters
+		SVO_prepare(width, height, 0.0f, 0.0f, 0.0, 0.0);
 	}
 
   public void processFrame() {
