@@ -199,7 +199,7 @@ FrameHandlerBase::UpdateResult FrameHandlerMono::processFrame()
     return RESULT_NO_KEYFRAME;
   }
   new_frame_->setKeyframe();
-  SVO_DEBUG_STREAM("New keyframe selected.");
+  __android_log_print(ANDROID_LOG_INFO, "Tracker", "New keyframe selected.");
 
   // new keyframe selected
   for(Features::iterator it=new_frame_->fts_.begin(); it!=new_frame_->fts_.end(); ++it)

@@ -42,15 +42,16 @@ Config::Config() :
     loba_thresh(2.0),
     loba_robust_huber_width(1.0),
     loba_num_iter(0),
-    kfselect_mindist(0.12),
-    triang_min_corner_score(20.0),
+    kfselect_mindist(0.08), // orig: 0.12
+    triang_min_corner_score(18.0), // orig: 20.0
     triang_half_patch_size(4),
     subpix_n_iter(10),
     max_n_kfs(0),
     img_imu_delay(0.0),
-    max_fts(120),
+    max_fts(240), // orig: 120
+    quality_bad_fts(50),
     quality_min_fts(50),
-    quality_max_drop_fts(40)
+    quality_max_drop_fts(140) // orig: 40
 {}
 
 Config& Config::getInstance()

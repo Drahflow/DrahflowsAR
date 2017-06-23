@@ -114,9 +114,12 @@ public:
   static size_t& maxFts() { return getInstance().max_fts; }
 
   /// If the number of tracked features drops below this threshold. Tracking quality is bad.
+  static size_t& qualityBadFts() { return getInstance().quality_bad_fts; }
+
+  /// If the number of tracked features drops below this threshold. Tracking quality is insufficient.
   static size_t& qualityMinFts() { return getInstance().quality_min_fts; }
 
-  /// If within one frame, this amount of features are dropped. Tracking quality is bad.
+  /// If within one frame, this amount of features are dropped. Tracking quality is insufficient.
   static int& qualityMaxFtsDrop() { return getInstance().quality_max_drop_fts; }
 
 private:
@@ -150,6 +153,7 @@ private:
   size_t max_n_kfs;
   double img_imu_delay;
   size_t max_fts;
+  size_t quality_bad_fts;
   size_t quality_min_fts;
   int quality_max_drop_fts;
 };

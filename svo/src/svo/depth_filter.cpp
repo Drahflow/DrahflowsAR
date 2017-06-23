@@ -29,6 +29,8 @@
 #include <svo/config.h>
 #include <svo/feature_detection.h>
 
+#include <android/log.h>
+
 namespace svo {
 
 int Seed::batch_counter = 0;
@@ -196,6 +198,7 @@ void DepthFilter::updateSeedsLoop()
 
 void DepthFilter::updateSeeds(FramePtr frame)
 {
+  __android_log_print(ANDROID_LOG_INFO, "Tracker", "updating depth filters...");
   // update only a limited number of seeds, because we don't have time to do it
   // for all the seeds in every frame!
   size_t n_updates=0, n_failed_matches=0, n_seeds = seeds_.size();

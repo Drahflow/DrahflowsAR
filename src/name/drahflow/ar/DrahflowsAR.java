@@ -361,7 +361,7 @@ public class DrahflowsAR extends Activity {
 			Log.e("AR", "Camera state: " + cameraState);
 			if(cameraState != CAMERA_OPERATIONAL) {
 				// camera not initialized fully, yet
-				if(cameraState == CAMERA_BOOTING && videoHistory.size() > 40) {
+				if(cameraState == CAMERA_BOOTING && videoHistory.size() > 10) {
 					videoHistory.clear();
 					cameraState = CAMERA_OPERATIONAL;
 				}
