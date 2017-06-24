@@ -81,6 +81,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
 
   jfloat *transformationData = env->GetFloatArrayElements(transformation, 0);
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEB");
+  // FIXME: This can apparently die...
   auto pose = frameHandler->lastFrame()->T_f_w_.inverse();
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEC");
   auto trans = pose.translation();
