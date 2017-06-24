@@ -50,6 +50,9 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.FileOutputStream;
+import android.media.Image;
+import android.media.ImageReader;
+import android.graphics.ImageFormat;
 
 public class DrahflowsAR extends Activity {
 	private GLSurfaceView mainView;
@@ -94,13 +97,38 @@ public class DrahflowsAR extends Activity {
 		mainView.setEGLContextClientVersion(2);
 		mainView.setRenderer(mainRenderer);
 		setContentView(mainView);
+		cameraReader = ImageReader.newInstance(camera_width, camera_height, ImageFormat.YUV_420_888, 4);
+		cameraReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+			@Override
+			public void onImageAvailable(ImageReader cameraReader) {
+				Image frame = cameraReader.acquireLatestImage();
+				if(frame == null) return;
+
+				videoHistory.addFrame(frame); // TODO: Maybe forward timestamp
+				frame.close();
+
+				Log.e("AR", "Camera state: " + cameraState);
+				if(cameraState != CAMERA_OPERATIONAL) {
+					// camera not initialized fully, yet
+					if(cameraState == CAMERA_BOOTING && videoHistory.size() > 10) {
+						videoHistory.clear();
+						cameraState = CAMERA_OPERATIONAL;
+					}
+					return;
+				} else if(videoHistory.size() < 3) {
+					// algorithms need 3 frames at least
+					return;
+				}
+
+				cameraTracker.processFrame();
+			}
+		}, new Handler()); // FIXME: Put on separate thread
 	}
 
 	private CameraDevice camera;
 	private HandlerThread mBackgroundThread;
 	private Handler mBackgroundHandler;
-	private SurfaceTexture cameraTexture;
-	private int cameraTextureHandle;
+	private ImageReader cameraReader;
 
 	@Override
 	protected void onResume() {
@@ -114,8 +142,6 @@ public class DrahflowsAR extends Activity {
 	}
 
 	protected void startCamera() {
-		// not yet possible
-		if(cameraTexture == null) return;
 		cameraState = CAMERA_NOT_AVAILABLE;
 
 		// mBackgroundThread = new HandlerThread("Camera Processing");
@@ -135,9 +161,7 @@ public class DrahflowsAR extends Activity {
 				public void onOpened(CameraDevice c) {
 					camera = c;
 
-					// cameraTexture.setDefaultBufferSize(1920, 1080);
-					cameraTexture.setDefaultBufferSize(camera_width, camera_height);
-					final Surface surface = new Surface(cameraTexture);
+					final Surface surface = cameraReader.getSurface();
 
 					try {
 						c.createCaptureSession(Arrays.asList(surface),
@@ -286,21 +310,6 @@ public class DrahflowsAR extends Activity {
 
 		@Override
 		public void onSurfaceCreated(GL10 glUnused, EGLConfig config) {
-			int[] someTexs = new int[1];
-			GLES20.glGenTextures(1, someTexs, 0);
-			cameraTextureHandle = someTexs[0];
-
-			GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, cameraTextureHandle);
-			GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
-			GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-			GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-			GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-			cameraTexture = new SurfaceTexture(cameraTextureHandle);
-
-			new Handler(Looper.getMainLooper()).post(new Runnable() {
-				public void run() { startCamera(); }
-			});
-
 			GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 			GLES20.glEnable(GLES20.GL_CULL_FACE);
 			GLES20.glEnable(GLES20.GL_DEPTH_TEST);
@@ -353,25 +362,8 @@ public class DrahflowsAR extends Activity {
 			sourceDataHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "u_SourceTexture");
 
 			GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-			cameraTexture.updateTexImage();
 
-			videoHistory.addFrame(cameraTexture, cameraTextureHandle);
 			Utils.noGlError();
-
-			Log.e("AR", "Camera state: " + cameraState);
-			if(cameraState != CAMERA_OPERATIONAL) {
-				// camera not initialized fully, yet
-				if(cameraState == CAMERA_BOOTING && videoHistory.size() > 10) {
-					videoHistory.clear();
-					cameraState = CAMERA_OPERATIONAL;
-				}
-				return;
-			} else if(videoHistory.size() < 3) {
-				// algorithms need 3 frames at least
-				return;
-			}
-
-			cameraTracker.processFrame();
 
 			long start = System.nanoTime();
 			Log.e("AR", "history size: " + videoHistory.size());
@@ -380,13 +372,14 @@ public class DrahflowsAR extends Activity {
 			Log.e("AR", "depth updating etc. took: " + (float)(end - start) / 1000000 + " ms");
 
 			Utils.noGlError();
+			if(videoHistory.size() == 0) return;
 
 			// Set the view matrix. This matrix can be said to represent the camera position.
 			// NOTE: In OpenGL 1, a ModelView matrix is used, which is a combination of a model and
 			// view matrix. In OpenGL 2, we can keep track of these matrices separately if we choose.
 			GLES20.glViewport(0, 0, width / 2, height);
 			Matrix.setLookAtM(lookAtMatrix, 0, eyeX - 0.03f, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ);
-			// FIXME: Keyframingi
+
 			drawDebugImage(videoHistory.getLastFrame().getIntensities());
 			Utils.noGlError();
 

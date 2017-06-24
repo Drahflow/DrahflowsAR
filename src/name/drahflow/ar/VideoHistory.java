@@ -10,6 +10,7 @@ import android.util.Log;
 import java.nio.FloatBuffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import android.media.Image;
 
 public class VideoHistory {
 	private ArrayList<VideoFrame> frames = new ArrayList<>();
@@ -50,7 +51,7 @@ public class VideoHistory {
 	}
 
 	public void addFrame(SurfaceTexture frame, int frameTextureHandle) {
-		if(frames.size() > 100) dropSomeFrame();
+		cleanup();
 
 		long timestamp = frame.getTimestamp();
 
@@ -117,6 +118,23 @@ public class VideoHistory {
 		Log.e("AR", "Video history size: " + frames.size());
 	}
 
+	public void addFrame(Image img) {
+		cleanup();
+
+		long timestamp = img.getTimestamp();
+
+		float[] intensities = new float[width * height];
+		final ByteBuffer Y = img.getPlanes()[0].getBuffer();
+		for(int i = 0; i < width * height; ++i) {
+			// Pixel stride: 1, Row stride: 640 on EPSON MOVERIO 300
+			intensities[i] = (((short)Y.get(i) + 256) % 256) / 255.0f;
+		}
+
+		frames.add(new VideoFrame(width, height, timestamp, intensities));
+
+		Log.e("AR", "Video history size: " + frames.size());
+	}
+
 	private String cameraCopyFragmentShader() {
 		return
 		   	"#extension GL_OES_EGL_image_external : require\n"
@@ -150,7 +168,8 @@ public class VideoHistory {
 			+ "}\n";
 	}
 
-	private void dropSomeFrame() {
-		VideoFrame frame = frames.remove(50);
+	private void cleanup() {
+		if(frames.size() > 100) frames.remove(0);
+		if(frames.size() > 5) frames.get(frames.size() - 5).clearIntensities();
 	}
 }
