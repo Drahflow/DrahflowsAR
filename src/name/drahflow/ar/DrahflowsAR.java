@@ -17,10 +17,6 @@ import java.util.ArrayList;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 import android.app.Activity;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLES20;
 import android.opengl.GLES30;
@@ -36,6 +32,7 @@ import android.graphics.SurfaceTexture;
 import android.view.View;
 import android.view.Surface;
 import android.view.Window;
+import android.hardware.SensorManager;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraDevice;
@@ -59,6 +56,7 @@ public class DrahflowsAR extends Activity {
 	private DevelopmentRenderer mainRenderer;
 	private VideoHistory videoHistory;
 	private CameraTracker cameraTracker;
+	private ScaleEstimator scaleEstimator;
 
 	private static final int CAMERA_NOT_AVAILABLE = 0;
 	private static final int CAMERA_BOOTING = 1;
@@ -123,6 +121,8 @@ public class DrahflowsAR extends Activity {
 				cameraTracker.processFrame();
 			}
 		}, new Handler()); // FIXME: Put on separate thread
+
+		scaleEstimator = new ScaleEstimator((SensorManager)getSystemService(SENSOR_SERVICE), videoHistory);
 	}
 
 	private CameraDevice camera;
@@ -139,6 +139,7 @@ public class DrahflowsAR extends Activity {
 		// new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_3D, false);
 
 		startCamera();
+		scaleEstimator.onResume();
 	}
 
 	protected void startCamera() {
@@ -239,6 +240,7 @@ public class DrahflowsAR extends Activity {
 		new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_2D, false);
 
 		stopCamera();
+		scaleEstimator.onPause();
 	}
 
 	protected void stopCamera() {
