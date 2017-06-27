@@ -10,7 +10,7 @@
 // n: Number of state variables
 // F: State propagation function
 // T: Datatype used for calculations. Must be supported by Eigen.
-template<int n, typename T = float>
+template<int n, typename T = double>
 class UnscentedKalmanFilter {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
