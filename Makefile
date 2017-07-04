@@ -1,6 +1,8 @@
-all: svo/toolchain svo/lib/libsvo.so
-	~/android-sdk-linux/ndk-bundle/ndk-build -B
+all: svo/toolchain svo/lib/libsvo.so libs/x86/libcameratracker.so
 	ant debug
+
+libs/x86/libcameratracker.so: jni/CameraTracker.cpp jni/CameraTracker.h
+	~/android-sdk-linux/ndk-bundle/ndk-build -B
 
 svo/toolchain:
 	mkdir -p svo/toolchain

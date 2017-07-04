@@ -59,6 +59,8 @@ FrameHandlerMono::~FrameHandlerMono()
 
 void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
 {
+  __android_log_print(ANDROID_LOG_INFO, "Tracker", "Stage: %d", stage_);
+
   if(!startFrameProcessingCommon(timestamp)) {
     __android_log_print(ANDROID_LOG_INFO, "Tracker", "Frame skipped.");
     return;
@@ -74,8 +76,6 @@ void FrameHandlerMono::addImage(const cv::Mat& img, const double timestamp)
   SVO_STOP_TIMER("pyramid_creation");
 
   // process frame
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "Stage: %d", stage_);
-
   UpdateResult res = RESULT_FAILURE;
   if(stage_ == STAGE_DEFAULT_FRAME)
     res = processFrame();

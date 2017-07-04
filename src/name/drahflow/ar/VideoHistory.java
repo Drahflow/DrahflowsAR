@@ -39,7 +39,13 @@ public class VideoHistory {
 	}
 
 	public VideoFrame getLastFrame() {
-		return frames.get(frames.size() - 1);
+		synchronized(frames) {
+			return frames.get(frames.size() - 1);
+		}
+	}
+
+	public VideoFrame get(int i) {
+		return frames.get(i);
 	}
 
 	public int size() {

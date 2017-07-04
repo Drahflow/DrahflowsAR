@@ -18,6 +18,10 @@ public class VideoFrame {
 		intensities = null;
 	}
 
+	public long getTimestamp() {
+		return timestamp;
+	}
+
 	public void setTransformation(float[] _transformation) {
 		transformation = _transformation;
 	}

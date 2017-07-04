@@ -66,6 +66,8 @@ public class DrahflowsAR extends Activity {
 	private static final int camera_width = 640;
 	private static final int camera_height = 480;
 
+	private static final long DISPLAY_LAG_NS = 150000000;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -88,6 +90,10 @@ public class DrahflowsAR extends Activity {
 		final int height = camera_height;
 		cameraState = CAMERA_NOT_AVAILABLE;
 
+		mCameraThread = new HandlerThread("Camera Processing");
+		mCameraThread.start();
+		mCameraHandler = new Handler(mCameraThread.getLooper());
+
 		videoHistory = new VideoHistory(width, height, camera_width, camera_height, 30l * 1000l * 1000l * 1000l);
 		cameraTracker = new CameraTracker(width, height, videoHistory);
 		mainRenderer = new DevelopmentRenderer(width, height);
@@ -102,7 +108,7 @@ public class DrahflowsAR extends Activity {
 				Image frame = cameraReader.acquireLatestImage();
 				if(frame == null) return;
 
-				videoHistory.addFrame(frame); // TODO: Maybe forward timestamp
+				videoHistory.addFrame(frame);
 				frame.close();
 
 				Log.e("AR", "Camera state: " + cameraState);
@@ -120,14 +126,14 @@ public class DrahflowsAR extends Activity {
 
 				cameraTracker.processFrame();
 			}
-		}, new Handler()); // FIXME: Put on separate thread
+		}, mCameraHandler);
 
-		scaleEstimator = new ScaleEstimator((SensorManager)getSystemService(SENSOR_SERVICE), videoHistory);
+		scaleEstimator = new ScaleEstimator((SensorManager)getSystemService(SENSOR_SERVICE), videoHistory, cameraTracker);
 	}
 
 	private CameraDevice camera;
-	private HandlerThread mBackgroundThread;
-	private Handler mBackgroundHandler;
+	private HandlerThread mCameraThread;
+	private Handler mCameraHandler;
 	private ImageReader cameraReader;
 
 	@Override
@@ -136,7 +142,7 @@ public class DrahflowsAR extends Activity {
 		// to take appropriate action when the activity looses focus
 		super.onResume();
 		mainView.onResume();
-		// new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_3D, false);
+		new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_3D, false);
 
 		startCamera();
 		scaleEstimator.onResume();
@@ -144,11 +150,6 @@ public class DrahflowsAR extends Activity {
 
 	protected void startCamera() {
 		cameraState = CAMERA_NOT_AVAILABLE;
-
-		// mBackgroundThread = new HandlerThread("Camera Processing");
-		// mBackgroundThread.start();
-		// mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
-		mBackgroundHandler = new Handler(); // FIXME
 
 		CameraManager cameraManager = (CameraManager)getSystemService(Context.CAMERA_SERVICE);
 		try {
@@ -197,7 +198,7 @@ public class DrahflowsAR extends Activity {
 														cameraState = CAMERA_BOOTING;
 													}
 												}
-											}, mBackgroundHandler);
+											}, mCameraHandler);
 										} catch (CameraAccessException e) {
 											e.printStackTrace();
 										}
@@ -225,7 +226,7 @@ public class DrahflowsAR extends Activity {
 				public void onClosed(CameraDevice c) {
 					camera = null;
 				}
-			}, mBackgroundHandler);
+			}, mCameraHandler);
 		} catch(CameraAccessException cae) {
 			throw new Error("May not open camera", cae);
 		}
@@ -247,11 +248,6 @@ public class DrahflowsAR extends Activity {
 		if(camera != null) {
 			camera.close();
 		}
-
-		if(mBackgroundThread != null) {
-			mBackgroundThread.getLooper().quitSafely();
-			mBackgroundHandler = null;
-		}
 	}
 
 	public class DevelopmentRenderer implements GLSurfaceView.Renderer {
@@ -263,11 +259,13 @@ public class DrahflowsAR extends Activity {
 		private int sourceDataHandle;
 
 		private float[] lookAtMatrix = new float[16];
+		private float[] viewMatrix = new float[16];
 		private float[] projectionMatrix = new float[16];
 		private float[] mvpMatrix = new float[16];
 		private int mvpMatrixHandle;
 
 		private int linkedShaderHandle;
+		private int linkedShaderHandleSimple;
 
 		private int width;
 		private int height;
@@ -284,12 +282,13 @@ public class DrahflowsAR extends Activity {
 
 		private void loadModelData() {
 			float[] positions = {
-				-0.05f, 0.025f, 0.0f,
-				-0.05f, -0.025f, 0.0f,
-				0.05f, 0.025f, 0.0f,
-				-0.05f, -0.025f, 0.0f,
-				0.05f, -0.025f, 0.0f,
-				0.05f, 0.025f, 0.0f,
+				-0.015f, 0.015f, -0.4f,
+				-0.015f, -0.015f, -0.4f,
+				0.015f, 0.015f, -0.4f,
+
+				-0.015f, -0.015f, -0.4f,
+				0.015f, -0.015f, -0.4f,
+				0.015f, 0.015f, -0.4f,
 			};
 
 			cubePositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
@@ -318,6 +317,9 @@ public class DrahflowsAR extends Activity {
 
 			linkedShaderHandle = Utils.compileShader(getVertexShader(), getFragmentShader(),
 					new String[] {"a_Position", "a_TexCoordinate"});
+
+			linkedShaderHandleSimple = Utils.compileShader(getVertexShader(), getFragmentShaderSimple(),
+					new String[] {"a_Position", "a_TexCoordinate"});
 		}
 
 		@Override
@@ -342,10 +344,11 @@ public class DrahflowsAR extends Activity {
 
 		@Override
 		public void onDrawFrame(GL10 glUnused) {
+			long frameStart = System.nanoTime();
 			// Position the eye in front of the origin.
 			final float eyeX = 0.0f;
 			final float eyeY = 0.0f;
-			final float eyeZ = 0.50f;
+			final float eyeZ = 0.0f;
 
 			// We are looking toward the distance
 			final float lookX = 0.0f;
@@ -366,30 +369,81 @@ public class DrahflowsAR extends Activity {
 			GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
 			Utils.noGlError();
-
-			long start = System.nanoTime();
-			Log.e("AR", "history size: " + videoHistory.size());
-
-			long end = System.nanoTime();
-			Log.e("AR", "depth updating etc. took: " + (float)(end - start) / 1000000 + " ms");
-
-			Utils.noGlError();
 			if(videoHistory.size() == 0) return;
 
-			// Set the view matrix. This matrix can be said to represent the camera position.
-			// NOTE: In OpenGL 1, a ModelView matrix is used, which is a combination of a model and
-			// view matrix. In OpenGL 2, we can keep track of these matrices separately if we choose.
+			// // Set the view matrix. This matrix can be said to represent the camera position.
+			// // NOTE: In OpenGL 1, a ModelView matrix is used, which is a combination of a model and
+			// // view matrix. In OpenGL 2, we can keep track of these matrices separately if we choose.
+			// GLES20.glViewport(0, 0, width / 2, height);
+			// Matrix.setLookAtMllookAtMatrix, 0, eyeX - 0.03f, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ);
+
+			// drawDebugImage(videoHistory.getLastFrame().getIntensities());
+			// Utils.noGlError();
+
+			// GLES20.glViewport(width / 2, 0, width / 2, height);
+			// Matrix.setLookAtM(lookAtMatrix, 0, eyeX + 0.03f, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ);
+			// // drawDebugImage(depthEstimate.debugProjectionBuffer, depthEstimate.getDepthEstimate());
+
+			float[] pose = new float[7];
+			cameraTracker.getTransformationAt(System.nanoTime() + DISPLAY_LAG_NS, pose);
+
 			GLES20.glViewport(0, 0, width / 2, height);
 			Matrix.setLookAtM(lookAtMatrix, 0, eyeX - 0.03f, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ);
-
-			drawDebugImage(videoHistory.getLastFrame().getIntensities());
+			drawEyeView(pose);
 			Utils.noGlError();
 
 			GLES20.glViewport(width / 2, 0, width / 2, height);
 			Matrix.setLookAtM(lookAtMatrix, 0, eyeX + 0.03f, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ);
-			// drawDebugImage(depthEstimate.debugProjectionBuffer, depthEstimate.getDepthEstimate());
-
+			drawEyeView(pose);
 			Utils.noGlError();
+
+			long frameEnd = System.nanoTime();
+			Log.e("AR", "frame rendering took: " + (frameEnd - frameStart) / 1000 + "us");
+		}
+
+		private void drawEyeView(float[] pose) {
+			final float qi = pose[3];
+			final float qj = -pose[4];
+			final float qk = -pose[5];
+			final float qr = pose[6];
+			final float[] rotationMatrix = new float[] {
+				1f - 2f*(qj*qj + qk*qk), 2f*(qi*qj - qk*qr), 2f*(qi*qk + qj*qr), 0f,
+				2f*(qi*qj + qk*qr), 1f - 2f*(qi*qi + qk*qk), 2f*(qj*qk - qi*qr), 0f,
+				2f*(qi*qk - qj*qr), 2f*(qj*qk + qi*qr), 1f - 2f*(qi*qi + qj*qj), 0f,
+				0f,                 0f,                 0f,                      1f
+			};
+
+			Matrix.multiplyMM(viewMatrix, 0, lookAtMatrix, 0, rotationMatrix, 0);
+			Matrix.translateM(viewMatrix, 0, -pose[0], pose[1], pose[2]);
+
+			long start = System.nanoTime();
+			drawScene();
+			// drawDebugImage(videoHistory.getLastFrame().getIntensities());
+			long end = System.nanoTime();
+			Log.e("AR", "drawScene took: " + (end - start) / 1000 + "us");
+		}
+
+		private void drawScene() {
+			// Set our per-vertex lighting program.
+			GLES20.glUseProgram(linkedShaderHandleSimple);
+
+			// Pass in the position information
+			cubePositions.position(0);
+			GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false,
+					0, cubePositions);
+			GLES20.glEnableVertexAttribArray(positionHandle);
+
+			// Pass in the texture coordinate information
+			cubeTexCoords.position(0);
+			GLES20.glVertexAttribPointer(texCoordsHandle, 2, GLES20.GL_FLOAT, false,
+					0, cubeTexCoords);
+			GLES20.glEnableVertexAttribArray(texCoordsHandle);
+
+			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
+			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+
+			// Actually draw
+			GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6);
 		}
 
 		private void drawDebugImage(int sourceTextureHandle) {
@@ -414,7 +468,7 @@ public class DrahflowsAR extends Activity {
 			GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
 			GLES20.glUniform1i(sourceDataHandle, 0);
 
-			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, lookAtMatrix, 0);
+			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
 			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
 
 			// Actually draw
@@ -502,6 +556,17 @@ public class DrahflowsAR extends Activity {
 				+ "varying vec2 v_TexCoordinate;\n"
 				+ "void main() {\n"
 				+ "   gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0) + texture2D(u_SourceTexture, v_TexCoordinate); \n"
+				+ "}\n";
+
+			return perPixelFragmentShader;
+		}
+
+		protected String getFragmentShaderSimple() {
+			final String perPixelFragmentShader =
+				  "precision mediump float;\n" // Set the default precision to medium.
+				+ "varying vec2 v_TexCoordinate;\n"
+				+ "void main() {\n"
+				+ "   gl_FragColor = vec4(v_TexCoordinate.x, v_TexCoordinate.y, 1.0, 0.0); \n"
 				+ "}\n";
 
 			return perPixelFragmentShader;

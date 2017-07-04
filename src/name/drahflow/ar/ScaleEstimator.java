@@ -6,52 +6,68 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import java.util.ArrayList;
 import android.util.Log;
+import android.os.Handler;
+import android.os.HandlerThread;
 
 class ScaleEstimator {
 	private SensorManager sensorManager;
 	private Sensor accelerometer;
-	private SensorEventListener sensorListener;
+	private SensorEventListener accelerometerListener;
+	private Sensor gyroscope;
+	private SensorEventListener gyroscopeListener;
 	private VideoHistory video;
+	private CameraTracker tracker;
+
+	private HandlerThread sensorThread;
+	private Handler sensorHandler;
 
 	private ArrayList<float[]> sensorHistory = new ArrayList<>();
 	private float xScale, yScale, zScale;
 
-	public ScaleEstimator(SensorManager _sensorManager, VideoHistory _video) {
+	public ScaleEstimator(SensorManager _sensorManager, VideoHistory _video, CameraTracker _tracker) {
 		video = _video;
+		tracker = _tracker;
 
 		xScale = yScale = zScale = 1.0f;
 
+		sensorThread = new HandlerThread("Sensor Processing");
+		sensorThread.start();
+		sensorHandler = new Handler(sensorThread.getLooper());
+
 		sensorManager = _sensorManager;
 		accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-		sensorListener = new SensorEventListener() {
+		accelerometerListener = new SensorEventListener() {
 			@Override
 			public void onAccuracyChanged(Sensor s, int accuracy) {}
 
 			@Override
 			public void onSensorChanged(SensorEvent e) {
 				Log.e("AR", String.format("Acceleration: %6.4f,%6.4f,%6.4f", e.values[0], e.values[1], e.values[2]));
-				float length = (float)(Math.sqrt(
-						e.values[0] * e.values[0] +
-						e.values[1] * e.values[1] +
-						e.values[2] * e.values[2]
-					));
-				Log.e("AR", String.format("  length: %6.4f", length));
+				tracker.processAccelerometerEvent(e);
+			}
+		};
 
-				sensorHistory.add(new float[] { e.values[0], e.values[1], e.values[2] });
+		gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+		gyroscopeListener = new SensorEventListener() {
+			@Override
+			public void onAccuracyChanged(Sensor s, int accuracy) {}
 
-				if(sensorHistory.size() == 500) {
-					calibrateAccelerometer();
-				}
+			@Override
+			public void onSensorChanged(SensorEvent e) {
+				Log.e("AR", String.format("Gyroscope: %6.4f,%6.4f,%6.4f", e.values[0], e.values[1], e.values[2]));
+				tracker.processGyroscopeEvent(e);
 			}
 		};
 	}
 
 	public void onResume() {
-		sensorManager.registerListener(sensorListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+		sensorManager.registerListener(accelerometerListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL, sensorHandler);
+		sensorManager.registerListener(gyroscopeListener, gyroscope, SensorManager.SENSOR_DELAY_GAME, sensorHandler);
 	}
 	
 	public void onPause() {
-		sensorManager.unregisterListener(sensorListener);
+		sensorManager.unregisterListener(accelerometerListener);
+		sensorManager.unregisterListener(gyroscopeListener);
 	}
 	
 	private final static float EPSILON = 1e-6f;

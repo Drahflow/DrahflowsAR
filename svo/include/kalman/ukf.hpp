@@ -8,11 +8,11 @@
 // Unscented Kalman Filter, as per Wikipedia
 //
 // n: Number of state variables
-// F: State propagation function
-// T: Datatype used for calculations. Must be supported by Eigen.
+// T: Datatype used for calculations. Must be supported by Eigen, better use double or better.
 template<int n, typename T = double>
 class UnscentedKalmanFilter {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   private:
     template<int r, int c> using Matrix = Eigen::Matrix<T, r, c>;
@@ -26,11 +26,13 @@ class UnscentedKalmanFilter {
   public:
     UnscentedKalmanFilter(const Matrix<n, 1> &x0, const Matrix<n, n> &P0): x(x0), P(P0) { }
 
-    auto state() const -> auto {
-      return (struct {
-        decltype(this->x) x;
-        decltype(this->P) P;
-      }) { x, P };
+    typedef struct {
+      Matrix<n, 1> x;
+      Matrix<n, n> P;
+    } State;
+
+    State state() const {
+      return State{x, P};
     }
 
     // w: Mean of process noise.
@@ -81,8 +83,8 @@ class UnscentedKalmanFilter {
       P = P_k;
     }
 
-    // v: Observation noise.
-    // R: Observation covariance matrix.
+    // v: Mean of observation noise.
+    // R: Covariance of observation noise.
     // H: Observation function.
     // z: Actual data.
     template<int m, typename H>
@@ -142,7 +144,7 @@ class UnscentedKalmanFilter {
 
 // Takes a function f'(x) and returns a kalman filter propagation function based on it
 template<typename R, typename T, typename X>
-auto EulerPropagator(const std::function<R(const X&)> &f, const T &dt) -> auto {
+std::function<R(const X&)> EulerPropagator(const std::function<R(const X&)> &f, const T &dt) {
   return [&f, &dt](const X &x) {
     return x + dt * f(x);
   };
@@ -150,7 +152,7 @@ auto EulerPropagator(const std::function<R(const X&)> &f, const T &dt) -> auto {
 
 // Takes a function f'(x) and returns a kalman filter propagation function based on it
 template<typename R, typename T, typename X>
-auto RungeKuttaPropagator(const std::function<R(const X&)> &f, const T &dt) -> auto {
+std::function<R(const X&)> RungeKuttaPropagator(const std::function<R(const X&)> &f, const T &dt) {
   return [&f, &dt](const X &x) {
     auto k1 = f(x);
     auto k2 = f(x + dt/2 * k1);
