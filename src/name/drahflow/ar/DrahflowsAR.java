@@ -260,8 +260,10 @@ public class DrahflowsAR extends Activity {
 
 		private float[] lookAtMatrix = new float[16];
 		private float[] viewMatrix = new float[16];
+		private float[] modelMatrix = new float[16];
 		private float[] projectionMatrix = new float[16];
 		private float[] mvpMatrix = new float[16];
+		private float[] mvMatrix = new float[16];
 		private int mvpMatrixHandle;
 
 		private int linkedShaderHandle;
@@ -282,27 +284,143 @@ public class DrahflowsAR extends Activity {
 
 		private void loadModelData() {
 			float[] positions = {
-				-0.015f, 0.015f, -0.4f,
-				-0.015f, -0.015f, -0.4f,
-				0.015f, 0.015f, -0.4f,
+				-1, -1, -1,   1, -1, -1,
+				 1, -1, -1,   1,  1, -1,
+				 1,  1, -1,  -1,  1, -1,
+				-1,  1, -1,  -1, -1, -1,
 
-				-0.015f, -0.015f, -0.4f,
-				0.015f, -0.015f, -0.4f,
-				0.015f, 0.015f, -0.4f,
+				-1, -1, -1,  -1, -1,  1,  
+				 1, -1, -1,   1, -1,  1,  
+				 1,  1, -1,   1,  1,  1,  
+				-1,  1, -1,  -1,  1,  1,  
+
+				-1, -1,  1,   1, -1,  1,
+				 1, -1,  1,   1,  1,  1,
+				 1,  1,  1,  -1,  1,  1,
+				-1,  1,  1,  -1, -1,  1,
 			};
+
+			// float[] positions = {
+			// 	// Front face
+			// 	-0.015f, 0.015f, 0f,
+			// 	-0.015f, -0.015f, 0f,
+			// 	0.015f, 0.015f, 0f,
+			// 	-0.015f, -0.015f, 0f,
+			// 	0.015f, -0.015f, 0f,
+			// 	0.015f, 0.015f, 0f,
+
+			// 	// Right face
+			// 	0.015f, 0.015f, 0f,
+			// 	0.015f, -0.015f, 0f,
+			// 	0.015f, 0.015f, -0.03f,
+			// 	0.015f, -0.015f, 0f,
+			// 	0.015f, -0.015f, -0.03f,
+			// 	0.015f, 0.015f, -0.03f,
+
+			// 	// Back face
+			// 	0.015f, 0.015f, -0.03f,
+			// 	0.015f, -0.015f, -0.03f,
+			// 	-0.015f, 0.015f, -0.03f,
+			// 	0.015f, -0.015f, -0.03f,
+			// 	-0.015f, -0.015f, -0.03f,
+			// 	-0.015f, 0.015f, -0.03f,
+
+			// 	// Left face
+			// 	-0.015f, 0.015f, -0.03f,
+			// 	-0.015f, -0.015f, -0.03f,
+			// 	-0.015f, 0.015f, 0f,
+			// 	-0.015f, -0.015f, -0.03f,
+			// 	-0.015f, -0.015f, 0f,
+			// 	-0.015f, 0.015f, 0f,
+
+			// 	// Top face
+			// 	-0.015f, 0.015f, -0.03f,
+			// 	-0.015f, 0.015f, 0f,
+			// 	0.015f, 0.015f, -0.03f,
+			// 	-0.015f, 0.015f, 0f,
+			// 	0.015f, 0.015f, 0f,
+			// 	0.015f, 0.015f, -0.03f,
+
+			// 	// Bottom face
+			// 	0.015f, -0.015f, -0.03f,
+			// 	0.015f, -0.015f, 0f,
+			// 	-0.015f, -0.015f, -0.03f,
+			// 	0.015f, -0.015f, 0f,
+			// 	-0.015f, -0.015f, 0f,
+			// 	-0.015f, -0.015f, -0.03f,
+			// };
+
+			// float[] positions = {
+			// 	-0.015f, 0.015f, -0.4f,
+			// 	-0.015f, -0.015f, -0.4f,
+			// 	0.015f, 0.015f, -0.4f,
+
+			// 	-0.015f, -0.015f, -0.4f,
+			// 	0.015f, -0.015f, -0.4f,
+			// 	0.015f, 0.015f, -0.4f,
+			// };
 
 			cubePositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
 					.order(ByteOrder.nativeOrder()).asFloatBuffer();
 			cubePositions.put(positions).position(0);
 
-			float[] texCoords = {
-				0.0f, 0.0f,
+			final float[] texCoords = {												
+				// Front face
+				0.0f, 0.0f, 				
 				0.0f, 1.0f,
 				1.0f, 0.0f,
 				0.0f, 1.0f,
 				1.0f, 1.0f,
+				1.0f, 0.0f,				
+				
+				// Right face 
+				0.0f, 0.0f, 				
+				0.0f, 1.0f,
 				1.0f, 0.0f,
+				0.0f, 1.0f,
+				1.0f, 1.0f,
+				1.0f, 0.0f,	
+				
+				// Back face 
+				0.0f, 0.0f, 				
+				0.0f, 1.0f,
+				1.0f, 0.0f,
+				0.0f, 1.0f,
+				1.0f, 1.0f,
+				1.0f, 0.0f,	
+				
+				// Left face 
+				0.0f, 0.0f, 				
+				0.0f, 1.0f,
+				1.0f, 0.0f,
+				0.0f, 1.0f,
+				1.0f, 1.0f,
+				1.0f, 0.0f,	
+				
+				// Top face 
+				0.0f, 0.0f, 				
+				0.0f, 1.0f,
+				1.0f, 0.0f,
+				0.0f, 1.0f,
+				1.0f, 1.0f,
+				1.0f, 0.0f,	
+				
+				// Bottom face 
+				0.0f, 0.0f, 				
+				0.0f, 1.0f,
+				1.0f, 0.0f,
+				0.0f, 1.0f,
+				1.0f, 1.0f,
+				1.0f, 0.0f
 			};
+			// float[] texCoords = {
+			// 	0.0f, 0.0f,
+			// 	0.0f, 1.0f,
+			// 	1.0f, 0.0f,
+			// 	0.0f, 1.0f,
+			// 	1.0f, 1.0f,
+			// 	1.0f, 0.0f,
+			// };
 
 			cubeTexCoords = ByteBuffer.allocateDirect(texCoords.length * Utils.BYTES_PER_FLOAT)
 					.order(ByteOrder.nativeOrder()).asFloatBuffer();
@@ -331,7 +449,7 @@ public class DrahflowsAR extends Activity {
 			// Create a new perspective projection matrix. The height will stay the same
 			// while the width will vary as per aspect ratio.
 			final float ratio = (float) width / height;
-			final float zoom = 110f;
+			final float zoom = 111f;
 			final float left = -ratio / zoom;
 			final float right = ratio / zoom;
 			final float bottom = -1.0f / zoom;
@@ -388,12 +506,12 @@ public class DrahflowsAR extends Activity {
 			cameraTracker.getTransformationAt(System.nanoTime() + DISPLAY_LAG_NS, pose);
 
 			GLES20.glViewport(0, 0, width / 2, height);
-			Matrix.setLookAtM(lookAtMatrix, 0, eyeX - 0.03f, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ);
+			Matrix.setLookAtM(lookAtMatrix, 0, eyeX - 0.10f, eyeY, eyeZ, lookX - 0.10f, lookY, lookZ, upX, upY, upZ);
 			drawEyeView(pose);
 			Utils.noGlError();
 
 			GLES20.glViewport(width / 2, 0, width / 2, height);
-			Matrix.setLookAtM(lookAtMatrix, 0, eyeX + 0.03f, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ);
+			Matrix.setLookAtM(lookAtMatrix, 0, eyeX - 0.03f, eyeY, eyeZ, lookX - 0.03f, lookY, lookZ, upX, upY, upZ);
 			drawEyeView(pose);
 			Utils.noGlError();
 
@@ -424,6 +542,26 @@ public class DrahflowsAR extends Activity {
 		}
 
 		private void drawScene() {
+			drawCube(0f, 0f, -0.4f, 0.015f);
+
+			drawCube(0f, 0f, -0.4f - 0.03f, 0.003f);
+			drawCube(0f, 0f, -0.4f + 0.03f, 0.003f);
+			drawCube(-0.03f, 0f, -0.4f, 0.003f);
+			drawCube(0.03f, 0f, -0.4f, 0.003f);
+			drawCube(0f, -0.03f, -0.4f, 0.003f);
+			drawCube(0f, 0.03f, -0.4f, 0.003f);
+
+			drawCube(0f, 0f, -0.2f, 0.003f);
+			drawCube(0f, 0f, -0.6f, 0.003f);
+			drawCube(-0.2f, 0f, -0.4f, 0.003f);
+			drawCube(0.2f, 0f, -0.4f, 0.003f);
+			drawCube(0f, -0.2f, -0.4f, 0.003f);
+			drawCube(0f, 0.2f, -0.4f, 0.003f);
+		}
+		
+		private void drawCube(float x, float y, float z, float scale) {
+			Matrix.setIdentityM(modelMatrix, 0);
+
 			// Set our per-vertex lighting program.
 			GLES20.glUseProgram(linkedShaderHandleSimple);
 
@@ -439,11 +577,17 @@ public class DrahflowsAR extends Activity {
 					0, cubeTexCoords);
 			GLES20.glEnableVertexAttribArray(texCoordsHandle);
 
-			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
+			// Model transformations
+			Matrix.translateM(modelMatrix, 0, x, y, z);
+			Matrix.scaleM(modelMatrix, 0, scale, scale, scale);
+
+			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
 			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
 
 			// Actually draw
-			GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6);
+			// GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
+			GLES20.glDrawArrays(GLES20.GL_LINES, 0, 24);
 		}
 
 		private void drawDebugImage(int sourceTextureHandle) {
@@ -566,7 +710,8 @@ public class DrahflowsAR extends Activity {
 				  "precision mediump float;\n" // Set the default precision to medium.
 				+ "varying vec2 v_TexCoordinate;\n"
 				+ "void main() {\n"
-				+ "   gl_FragColor = vec4(v_TexCoordinate.x, v_TexCoordinate.y, 1.0, 0.0); \n"
+				// + "   gl_FragColor = vec4(v_TexCoordinate.x, v_TexCoordinate.y, 1.0, 0.0); \n"
+				+ "   gl_FragColor = vec4(0, 1, 0, 0.0); \n"
 				+ "}\n";
 
 			return perPixelFragmentShader;

@@ -26,7 +26,7 @@
   #include <fcntl.h>
 #endif
 
-#define MAP_SCALE 2.9
+#define MAP_SCALE 2.0
 
 using namespace Eigen;
 
@@ -178,9 +178,9 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1prepare
        0,    0,    0,    0,    0,    0,    0,    0,    0,  1e2,   0,   0,   0,    0,    0,    0,
        0,    0,    0,    0,    0,    0,    0,    0,    0,    0, 1e2,   0,   0,    0,    0,    0,
        0,    0,    0,    0,    0,    0,    0,    0,    0,    0,   0, 1e2,   0,    0,    0,    0,
-       0,    0,    0,    0,    0,    0,    0,    0,    0,    0,   0,   0,1e+2,    0,    0,    0,
-       0,    0,    0,    0,    0,    0,    0,    0,    0,    0,   0,   0,   0, 1e+2,    0,    0,
-       0,    0,    0,    0,    0,    0,    0,    0,    0,    0,   0,   0,   0,    0, 1e+2,    0,
+       0,    0,    0,    0,    0,    0,    0,    0,    0,    0,   0,   0,1e-0,    0,    0,    0,
+       0,    0,    0,    0,    0,    0,    0,    0,    0,    0,   0,   0,   0, 1e-0,    0,    0,
+       0,    0,    0,    0,    0,    0,    0,    0,    0,    0,   0,   0,   0,    0, 1e-0,    0,
        0,    0,    0,    0,    0,    0,    0,    0,    0,    0,   0,   0,   0,    0,    0, 1e-9;
 
   frameMeasureNoise = Matrix<double, 3, 1>::Zero();
@@ -434,20 +434,20 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
 
    updateKalmanFilter(time_nano);
 
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
-       sensorFusion->state().x(A_x),
-       sensorFusion->state().x(A_y),
-       sensorFusion->state().x(A_z));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(aXYZ): %lf %lf %lf",
-       sensorFusion->state().P(A_x, A_x),
-       sensorFusion->state().P(A_y, A_y),
-       sensorFusion->state().P(A_z, A_z));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
-       sensorFusion->state().x(g_x),
-       sensorFusion->state().x(g_y),
-       sensorFusion->state().x(g_z));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sensorFusion->state().x(MapScale));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sensorFusion->state().P(MapScale, MapScale));
+   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
+   //     sensorFusion->state().x(A_x),
+   //     sensorFusion->state().x(A_y),
+   //     sensorFusion->state().x(A_z));
+   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(aXYZ): %lf %lf %lf",
+   //     sensorFusion->state().P(A_x, A_x),
+   //     sensorFusion->state().P(A_y, A_y),
+   //     sensorFusion->state().P(A_z, A_z));
+   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
+   //     sensorFusion->state().x(g_x),
+   //     sensorFusion->state().x(g_y),
+   //     sensorFusion->state().x(g_z));
+   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sensorFusion->state().x(MapScale));
+   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sensorFusion->state().P(MapScale, MapScale));
    __android_log_print(ANDROID_LOG_INFO, "Tracker", "Updating from accelerometer...");
 
 
@@ -472,7 +472,8 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
          double rel_ay = -x(A_y) / MAP_SCALE + x(g_y);
          double rel_az = -x(A_z) / MAP_SCALE + x(g_z);
 
-         Quaternion<double> q(sensorFusion->rot_w, sensorFusion->rot_x, sensorFusion->rot_y, sensorFusion->rot_z);
+         // signs randomly inverted until gravity vector became semi-stable
+         Quaternion<double> q(sensorFusion->rot_w, -sensorFusion->rot_x, sensorFusion->rot_y, sensorFusion->rot_z);
          Quaternion<double> accel(0, rel_ax, rel_ay, rel_az);
 
          Quaternion<double> rotated = q * accel * q.inverse();
@@ -484,6 +485,10 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
          return ret;
        }, observation);
 
+   __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
+       sensorFusion->state().x(g_x),
+       sensorFusion->state().x(g_y),
+       sensorFusion->state().x(g_z));
    __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
        sensorFusion->state().x(A_x),
        sensorFusion->state().x(A_y),
@@ -492,10 +497,6 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
        sensorFusion->state().P(A_x, A_x),
        sensorFusion->state().P(A_y, A_y),
        sensorFusion->state().P(A_z, A_z));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
-       sensorFusion->state().x(g_x),
-       sensorFusion->state().x(g_y),
-       sensorFusion->state().x(g_z));
    __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sensorFusion->state().x(MapScale));
    __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sensorFusion->state().P(MapScale, MapScale));
 }
