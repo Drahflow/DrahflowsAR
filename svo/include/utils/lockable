@@ -33,6 +33,7 @@ template<class T> class lockable {
     };
 
     lockable(const T &t): t(t) { }
+    template<class... U> explicit lockable(U&&... u): t(std::forward<U>(u)...) { }
 
     locked_ptr lock() {
       return locked_ptr(l, &t);
