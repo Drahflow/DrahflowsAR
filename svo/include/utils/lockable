@@ -1,0 +1,49 @@
+#ifndef LOCKABLE_HEADER
+#define LOCKABLE_HEADER
+
+#include <mutex>
+
+template<class T> class lockable {
+  public:
+    class locked_ptr {
+      public:
+        T &operator * () const { return *t; }
+        T *operator -> () const { return t; }
+
+        locked_ptr(locked_ptr &&src): lock_(src.lock_) {
+          t = std::move(src.t);
+          src.t = nullptr;
+        }
+
+        ~locked_ptr() {
+          if(t) lock_.unlock();
+        }
+
+      private:
+        T *t;
+        std::mutex &lock_;
+
+        friend class lockable;
+        locked_ptr(std::mutex &lock, T *t): t(t), lock_(lock) {
+          lock_.lock();
+        }
+
+        locked_ptr(const locked_ptr &) = delete;
+        locked_ptr &operator = (const locked_ptr &) = delete;
+    };
+
+    lockable(const T &t): t(t) { }
+
+    locked_ptr lock() {
+      return locked_ptr(l, &t);
+    }
+
+  private:
+    T t;
+    std::mutex l;
+
+    lockable(const lockable &) = delete;
+    lockable &operator = (const lockable &) = delete;
+};
+
+#endif

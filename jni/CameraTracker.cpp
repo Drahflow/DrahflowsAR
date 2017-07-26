@@ -13,7 +13,7 @@
 #include <vikit/pinhole_camera.h>
 #include <opencv2/opencv.hpp>
 #include <iostream>
-#include <mutex>
+#include <utils/lockable>
 #include <kalman/ukf.hpp>
 #include <Eigen/Geometry>
 
@@ -58,7 +58,6 @@ static int cameraWidth;
 static int cameraHeight;
 static svo::FrameHandlerMono *frameHandler;
 static unsigned char *intensitiesBuffer;
-static std::mutex sensorFusionLock;
 
 struct SensorFusion: public UnscentedKalmanFilter<D> {
   public:
@@ -133,7 +132,8 @@ struct SensorFusion: public UnscentedKalmanFilter<D> {
           rot_w);
     }
 };
-SensorFusion *sensorFusion;
+
+static lockable<SensorFusion> *sensorFusion;
 
 static long long int sensorFusionTimestamp = -1;
 static V predictionNoise;
@@ -265,16 +265,16 @@ static void initializeKalmanFilter() {
     0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,  0,  0,1e5, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,  0,  0,  0, 1e-5;
 
-  sensorFusion = new SensorFusion(initialState, initialCovariance);
-
-  sensorFusion->rot_w = 1;
-  sensorFusion->rot_x = 0;
-  sensorFusion->rot_y = 0;
-  sensorFusion->rot_z = 0;
+  sensorFusion = new lockable<SensorFusion>(SensorFusion(initialState, initialCovariance));
+  auto sF = sensorFusion->lock();
+  sF->rot_w = 1;
+  sF->rot_x = 0;
+  sF->rot_y = 0;
+  sF->rot_z = 0;
 }
 
 static void updateKalmanFilter(long long time_nano) {
-  std::lock_guard<std::mutex> lock(sensorFusionLock);
+  auto sF = sensorFusion->lock();
 
   if(sensorFusionTimestamp < 0) {
     initializeKalmanFilter();
@@ -288,8 +288,8 @@ static void updateKalmanFilter(long long time_nano) {
       const long int dt_int = std::min(time_nano - sensorFusionTimestamp, 10000000ll);
       const double dt = dt_int / 100000000.0;
 
-      sensorFusion->predict(predictionNoise, predictionNoiseCovariance, sensorModelRungeKutta(dt));
-      sensorFusion->predictRot(dt);
+      sF->predict(predictionNoise, predictionNoiseCovariance, sensorModelRungeKutta(dt));
+      sF->predictRot(dt);
 
       sensorFusionTimestamp += dt_int;
     }
@@ -374,9 +374,9 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
     trans[2];
 
   {
-    std::lock_guard<std::mutex> lock(sensorFusionLock);
+    auto sF = sensorFusion->lock();
 
-    sensorFusion->update<3>(frameMeasureNoise, frameMeasureNoiseCovariance,
+    sF->update<3>(frameMeasureNoise, frameMeasureNoiseCovariance,
         [](const V &x) -> Matrix<double, 3, 1> {
         Matrix<double, 3, 1> ret;
           ret <<
@@ -386,34 +386,34 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
           return ret;
         }, observation);
 
-    sensorFusion->rot_x = rot.x();
-    sensorFusion->rot_y = rot.y();
-    sensorFusion->rot_z = rot.z();
-    sensorFusion->rot_w = rot.w();
+    sF->rot_x = rot.x();
+    sF->rot_y = rot.y();
+    sF->rot_z = rot.z();
+    sF->rot_w = rot.w();
 
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "XYZ: %lf %lf %lf",
-      sensorFusion->state().x(X_x),
-      sensorFusion->state().x(X_y),
-      sensorFusion->state().x(X_z));
+      sF->state().x(X_x),
+      sF->state().x(X_y),
+      sF->state().x(X_z));
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "vXYZ: %lf %lf %lf",
-      sensorFusion->state().x(V_x),
-      sensorFusion->state().x(V_y),
-      sensorFusion->state().x(V_z));
+      sF->state().x(V_x),
+      sF->state().x(V_y),
+      sF->state().x(V_z));
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
-      sensorFusion->state().x(A_x),
-      sensorFusion->state().x(A_y),
-      sensorFusion->state().x(A_z));
+      sF->state().x(A_x),
+      sF->state().x(A_y),
+      sF->state().x(A_z));
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(XYZ): %lf %lf %lf",
-      sensorFusion->state().P(X_x, X_x),
-      sensorFusion->state().P(X_y, X_y),
-      sensorFusion->state().P(X_z, X_z));
+      sF->state().P(X_x, X_x),
+      sF->state().P(X_y, X_y),
+      sF->state().P(X_z, X_z));
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "rot: %lf %lf %lf %lf",
-      sensorFusion->rot_x,
-      sensorFusion->rot_y,
-      sensorFusion->rot_z,
-      sensorFusion->rot_w);
+      sF->rot_x,
+      sF->rot_y,
+      sF->rot_z,
+      sF->rot_w);
 
-    saveTransformation(env, *sensorFusion, transformation);
+    saveTransformation(env, *sF, transformation);
   }
 
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "ID: %d, #Features: %d, took %lf ms",
@@ -463,8 +463,9 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
 
    env->ReleaseFloatArrayElements(xyz, xyzData, 0);
 
-   sensorFusion->update<3>(accelerometerMeasureNoise, accelerometerMeasureNoiseCovariance,
-       [](const V &x) -> Matrix<double, 3, 1> {
+   auto sF = sensorFusion->lock();
+   sF->update<3>(accelerometerMeasureNoise, accelerometerMeasureNoiseCovariance,
+       [&sF](const V &x) -> Matrix<double, 3, 1> {
          Matrix<double, 3, 1> ret;
 
          double rel_ax = x(A_x) / MAP_SCALE + x(g_x);
@@ -472,7 +473,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
          double rel_az = -x(A_z) / MAP_SCALE + x(g_z);
 
          // signs randomly inverted until gravity vector became semi-stable
-         Quaternion<double> q(sensorFusion->rot_w, -sensorFusion->rot_x, sensorFusion->rot_y, sensorFusion->rot_z);
+         Quaternion<double> q(sF->rot_w, -sF->rot_x, sF->rot_y, sF->rot_z);
          Quaternion<double> accel(0, rel_ax, rel_ay, rel_az);
 
          Quaternion<double> rotated = q * accel * q.inverse();
@@ -485,19 +486,19 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
        }, observation);
 
    __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
-       sensorFusion->state().x(g_x),
-       sensorFusion->state().x(g_y),
-       sensorFusion->state().x(g_z));
+       sF->state().x(g_x),
+       sF->state().x(g_y),
+       sF->state().x(g_z));
    __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
-       sensorFusion->state().x(A_x),
-       sensorFusion->state().x(A_y),
-       sensorFusion->state().x(A_z));
+       sF->state().x(A_x),
+       sF->state().x(A_y),
+       sF->state().x(A_z));
    __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(aXYZ): %lf %lf %lf",
-       sensorFusion->state().P(A_x, A_x),
-       sensorFusion->state().P(A_y, A_y),
-       sensorFusion->state().P(A_z, A_z));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sensorFusion->state().x(MapScale));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sensorFusion->state().P(MapScale, MapScale));
+       sF->state().P(A_x, A_x),
+       sF->state().P(A_y, A_y),
+       sF->state().P(A_z, A_z));
+   __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sF->state().x(MapScale));
+   __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sF->state().P(MapScale, MapScale));
 }
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processGyroscope
@@ -521,7 +522,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processGyroscope
 
   long long int middle_time = 0;
   {
-    std::lock_guard<std::mutex> lock(sensorFusionLock);
+    auto sF = sensorFusion->lock();
     middle_time = (time_nano + sensorFusionTimestamp) / 2;
   }
 
@@ -532,9 +533,9 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processGyroscope
   updateKalmanFilter(middle_time);
 
   {
-    std::lock_guard<std::mutex> lock(sensorFusionLock);
+    auto sF = sensorFusion->lock();
 
-    sensorFusion->update<3>(gyroscopeMeasureNoise, gyroscopeMeasureNoiseCovariance,
+    sF->update<3>(gyroscopeMeasureNoise, gyroscopeMeasureNoiseCovariance,
         [](const V &x) -> Matrix<double, 3, 1> {
           Matrix<double, 3, 1> ret;
           ret <<
@@ -558,8 +559,8 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1getTransformatio
 
   SensorFusion tmp(V::Zero(), M::Zero());
   {
-    std::lock_guard<std::mutex> lock(sensorFusionLock);
-    tmp = *sensorFusion;
+    auto sF = sensorFusion->lock();
+    tmp = *sF;
     tmpTimestamp = sensorFusionTimestamp;
   }
 
