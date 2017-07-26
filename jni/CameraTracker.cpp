@@ -63,6 +63,7 @@ struct SensorFusion: public UnscentedKalmanFilter<D> {
   public:
     SensorFusion(const V &v, const M &m): UnscentedKalmanFilter(v, m) {}
 
+    long long int timestamp = -1;
     double rot_x, rot_y, rot_z, rot_w;
 
     // Euler for quaternion rotation, because I'm confused
@@ -133,9 +134,7 @@ struct SensorFusion: public UnscentedKalmanFilter<D> {
     }
 };
 
-static lockable<SensorFusion> *sensorFusion;
-
-static long long int sensorFusionTimestamp = -1;
+static lockable<SensorFusion> *sensorFusion = nullptr;
 static V predictionNoise;
 static M predictionNoiseCovariance;
 static Matrix<double, 3, 1> frameMeasureNoise;
@@ -236,7 +235,7 @@ static std::function<V(const V&)> sensorModelRungeKutta(double dt) {
   };
 }
 
-static void initializeKalmanFilter() {
+static void initializeKalmanFilter(long long time_nano) {
   V initialState;
   initialState <<
     0, 0, 0,
@@ -265,37 +264,38 @@ static void initializeKalmanFilter() {
     0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,  0,  0,1e5, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,  0,  0,  0, 1e-5;
 
-  sensorFusion = new lockable<SensorFusion>(SensorFusion(initialState, initialCovariance));
+  sensorFusion = new lockable<SensorFusion>(initialState, initialCovariance);
   auto sF = sensorFusion->lock();
   sF->rot_w = 1;
   sF->rot_x = 0;
   sF->rot_y = 0;
   sF->rot_z = 0;
+  sF->timestamp = time_nano;
 }
 
 static void updateKalmanFilter(long long time_nano) {
-  auto sF = sensorFusion->lock();
-
-  if(sensorFusionTimestamp < 0) {
-    initializeKalmanFilter();
+  if(!sensorFusion) {
+    initializeKalmanFilter(time_nano);
   } else {
-    while(sensorFusionTimestamp < time_nano) {
+    auto sF = sensorFusion->lock();
+
+    while(sF->timestamp < time_nano) {
       // maybe also replay gyro history?
 
       __android_log_print(ANDROID_LOG_INFO, "Tracker", "t_sensor: %lld   t_frame: %lld",
-          sensorFusionTimestamp, time_nano);
+          sF->timestamp, time_nano);
 
-      const long int dt_int = std::min(time_nano - sensorFusionTimestamp, 10000000ll);
+      const long int dt_int = std::min(time_nano - sF->timestamp, 10000000ll);
       const double dt = dt_int / 100000000.0;
 
       sF->predict(predictionNoise, predictionNoiseCovariance, sensorModelRungeKutta(dt));
       sF->predictRot(dt);
 
-      sensorFusionTimestamp += dt_int;
+      sF->timestamp += dt_int;
     }
-  }
 
-  sensorFusionTimestamp = time_nano;
+    sF->timestamp = time_nano;
+  }
 }
 
 static void saveTransformation(JNIEnv *env, SensorFusion &filter, jfloatArray transformation) {
@@ -523,12 +523,12 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processGyroscope
   long long int middle_time = 0;
   {
     auto sF = sensorFusion->lock();
-    middle_time = (time_nano + sensorFusionTimestamp) / 2;
-  }
+    middle_time = (time_nano + sF->timestamp) / 2;
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "sensorFusionTimestamp: %lld", sensorFusionTimestamp);
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "middle_time: %lld", middle_time);
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "time_nano: %lld", time_nano);
+    __android_log_print(ANDROID_LOG_INFO, "Tracker", "sensorFusionTimestamp: %lld", sF->timestamp);
+    __android_log_print(ANDROID_LOG_INFO, "Tracker", "middle_time: %lld", middle_time);
+    __android_log_print(ANDROID_LOG_INFO, "Tracker", "time_nano: %lld", time_nano);
+  }
 
   updateKalmanFilter(middle_time);
 
@@ -555,24 +555,21 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1getTransformatio
   (JNIEnv *env, jclass, jlong time_nano, jfloatArray transformation) {
   if(!trackingEstablished) return;
 
-  long long int tmpTimestamp;
-
   SensorFusion tmp(V::Zero(), M::Zero());
   {
     auto sF = sensorFusion->lock();
     tmp = *sF;
-    tmpTimestamp = sensorFusionTimestamp;
   }
 
-  while(tmpTimestamp < time_nano) {
+  while(tmp.timestamp < time_nano) {
     // maybe also replay gyro history?
 
-    const long int dt_int = std::min(time_nano - tmpTimestamp, 10000000ll);
+    const long int dt_int = std::min(time_nano - tmp.timestamp, 10000000ll);
     const double dt = dt_int / 100000000.0;
     tmp.predict(predictionNoise, predictionNoiseCovariance, sensorModelRungeKutta(dt));
     tmp.predictRot(dt);
 
-    tmpTimestamp += dt_int;
+    tmp.timestamp += dt_int;
   }
 
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "est. XYZ: %lf %lf %lf",
