@@ -134,7 +134,23 @@ struct SensorFusion: public UnscentedKalmanFilter<D> {
     }
 };
 
+class RecordedEvent {
+  public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    virtual ~RecordedEvent() { }
+    virtual void applyTo(SensorFusion &sF) = 0;
+
+    const long long timestamp;
+
+  protected:
+    RecordedEvent(long long time_nano): timestamp(time_nano) { }
+};
+
+
 static lockable<SensorFusion> *sensorFusion = nullptr;
+static lockable<std::vector<RecordedEvent *>> events;
+
 static V predictionNoise;
 static M predictionNoiseCovariance;
 static Matrix<double, 3, 1> frameMeasureNoise;
@@ -273,29 +289,21 @@ static void initializeKalmanFilter(long long time_nano) {
   sF->timestamp = time_nano;
 }
 
-static void updateKalmanFilter(long long time_nano) {
-  if(!sensorFusion) {
-    initializeKalmanFilter(time_nano);
-  } else {
-    auto sF = sensorFusion->lock();
+static void updateKalmanFilter(SensorFusion &sF, long long time_nano) {
+  while(sF.timestamp < time_nano) {
+    __android_log_print(ANDROID_LOG_INFO, "Tracker", "t_sensor: %lld   t_frame: %lld",
+        sF.timestamp, time_nano);
 
-    while(sF->timestamp < time_nano) {
-      // maybe also replay gyro history?
+    const long int dt_int = std::min(time_nano - sF.timestamp, 10000000ll);
+    const double dt = dt_int / 100000000.0;
 
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "t_sensor: %lld   t_frame: %lld",
-          sF->timestamp, time_nano);
+    sF.predict(predictionNoise, predictionNoiseCovariance, sensorModelRungeKutta(dt));
+    sF.predictRot(dt);
 
-      const long int dt_int = std::min(time_nano - sF->timestamp, 10000000ll);
-      const double dt = dt_int / 100000000.0;
-
-      sF->predict(predictionNoise, predictionNoiseCovariance, sensorModelRungeKutta(dt));
-      sF->predictRot(dt);
-
-      sF->timestamp += dt_int;
-    }
-
-    sF->timestamp = time_nano;
+    sF.timestamp += dt_int;
   }
+
+  sF.timestamp = time_nano;
 }
 
 static void saveTransformation(JNIEnv *env, SensorFusion &filter, jfloatArray transformation) {
@@ -321,11 +329,10 @@ static void saveTransformation(JNIEnv *env, SensorFusion &filter, jfloatArray tr
 }
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
-  (JNIEnv *env, jclass, jfloatArray intensities, jfloatArray transformation,
-   jlong time_nano) {
+  (JNIEnv *env, jclass, jfloatArray intensities, jlong time_nano) {
   // trackingEstablished = true;
   // updateKalmanFilter(time_nano);
-  // return; // This + above lines are FIXME
+  // return; // This + above lines are FIXME to explore dead reckoning quality
 
   jsize intensitiesLen = env->GetArrayLength(intensities);
   if(intensitiesLen != cameraWidth * cameraHeight) {
@@ -364,17 +371,19 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
   auto trans = pose.translation();
   auto rot = pose.unit_quaternion();
 
-  trackingEstablished = true;
-  updateKalmanFilter(time_nano);
-
-  Matrix<double, 3, 1> observation;
-  observation <<
-    trans[0],
-    trans[1],
-    trans[2];
+  if(!sensorFusion) initializeKalmanFilter(time_nano);
 
   {
     auto sF = sensorFusion->lock();
+
+    trackingEstablished = true;
+    updateKalmanFilter(*sF, time_nano);
+
+    Matrix<double, 3, 1> observation;
+    observation <<
+      trans[0],
+      trans[1],
+      trans[2];
 
     sF->update<3>(frameMeasureNoise, frameMeasureNoiseCovariance,
         [](const V &x) -> Matrix<double, 3, 1> {
@@ -412,8 +421,6 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
       sF->rot_y,
       sF->rot_z,
       sF->rot_w);
-
-    saveTransformation(env, *sF, transformation);
   }
 
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "ID: %d, #Features: %d, took %lf ms",
@@ -421,6 +428,93 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
       frameHandler->lastNumObservations(),
       frameHandler->lastProcessingTime() * 1000);
 }
+
+class RecordedAccelerometerEvent: public RecordedEvent {
+  private:
+    Matrix<double, 3, 1> observation;
+
+  public:
+    RecordedAccelerometerEvent(long long time_nano, jfloat *xyzData): RecordedEvent(time_nano) {
+      observation << xyzData[0], xyzData[1], xyzData[2];
+    }
+
+    void applyTo(SensorFusion &sF) {
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "Updating from accelerometer...");
+
+      updateKalmanFilter(sF, timestamp);
+
+      sF.update<3>(accelerometerMeasureNoise, accelerometerMeasureNoiseCovariance,
+          [&sF](const V &x) -> Matrix<double, 3, 1> {
+            Matrix<double, 3, 1> ret;
+
+            double rel_ax = x(A_x) / MAP_SCALE + x(g_x);
+            double rel_ay = -x(A_y) / MAP_SCALE + x(g_y);
+            double rel_az = -x(A_z) / MAP_SCALE + x(g_z);
+
+            // signs randomly inverted until gravity vector became semi-stable
+            Quaternion<double> q(sF.rot_w, -sF.rot_x, sF.rot_y, sF.rot_z);
+            Quaternion<double> accel(0, rel_ax, rel_ay, rel_az);
+
+            Quaternion<double> rotated = q * accel * q.inverse();
+
+            ret <<
+              rotated.x() / 9.81 * 9.69,
+              rotated.y() / 9.81 * 9.676,
+              rotated.z() / 9.81 * 9.00;
+            return ret;
+          }, observation);
+
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
+          sF.state().x(g_x),
+          sF.state().x(g_y),
+          sF.state().x(g_z));
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
+          sF.state().x(A_x),
+          sF.state().x(A_y),
+          sF.state().x(A_z));
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(aXYZ): %lf %lf %lf",
+          sF.state().P(A_x, A_x),
+          sF.state().P(A_y, A_y),
+          sF.state().P(A_z, A_z));
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sF.state().x(MapScale));
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sF.state().P(MapScale, MapScale));
+    }
+};
+
+class RecordedGyroscopeEvent: public RecordedEvent {
+  private:
+    Matrix<double, 3, 1> observation;
+
+  public:
+    RecordedGyroscopeEvent(long long time_nano, jfloat *xyzData): RecordedEvent(time_nano) {
+      observation << xyzData[0], xyzData[1], xyzData[2];
+    }
+
+    void applyTo(SensorFusion &sF) {
+      // TODO: Evaluate whether this actually improves things.
+      const long long int middle_time = (timestamp + sF.timestamp) / 2;
+
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "sensorFusionTimestamp: %lld", sF.timestamp);
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "middle_time: %lld", middle_time);
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "time_nano: %lld", timestamp);
+
+      updateKalmanFilter(sF, middle_time);
+
+      sF.update<3>(gyroscopeMeasureNoise, gyroscopeMeasureNoiseCovariance,
+          [](const V &x) -> Matrix<double, 3, 1> {
+            Matrix<double, 3, 1> ret;
+            ret <<
+              x(rotv_x),
+              x(rotv_y),
+              x(rotv_z);
+            return ret;
+          }, observation);
+
+      updateKalmanFilter(sF, timestamp);
+
+      __android_log_print(ANDROID_LOG_INFO, "Tracker", "time_nano: %lld", timestamp);
+    }
+};
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerometer
   (JNIEnv *env, jclass, jfloatArray xyz, jlong time_nano) {
@@ -431,74 +525,15 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
      throw std::runtime_error("Accelerometer data has invalid size.");
    }
 
-   updateKalmanFilter(time_nano);
-
-   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
-   //     sensorFusion->state().x(A_x),
-   //     sensorFusion->state().x(A_y),
-   //     sensorFusion->state().x(A_z));
-   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(aXYZ): %lf %lf %lf",
-   //     sensorFusion->state().P(A_x, A_x),
-   //     sensorFusion->state().P(A_y, A_y),
-   //     sensorFusion->state().P(A_z, A_z));
-   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
-   //     sensorFusion->state().x(g_x),
-   //     sensorFusion->state().x(g_y),
-   //     sensorFusion->state().x(g_z));
-   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sensorFusion->state().x(MapScale));
-   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sensorFusion->state().P(MapScale, MapScale));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "Updating from accelerometer...");
-
-
    jfloat *xyzData = env->GetFloatArrayElements(xyz, 0);
 
    __android_log_print(ANDROID_LOG_INFO, "Tracker", "accelXYZ: %f %f %f",
        xyzData[0], xyzData[1], xyzData[2]);
 
-   Matrix<double, 3, 1> observation;
-   observation <<
-     xyzData[0],
-     xyzData[1],
-     xyzData[2];
+   RecordedAccelerometerEvent *record = new RecordedAccelerometerEvent(time_nano, xyzData);
+   events.lock()->push_back(record);
 
    env->ReleaseFloatArrayElements(xyz, xyzData, 0);
-
-   auto sF = sensorFusion->lock();
-   sF->update<3>(accelerometerMeasureNoise, accelerometerMeasureNoiseCovariance,
-       [&sF](const V &x) -> Matrix<double, 3, 1> {
-         Matrix<double, 3, 1> ret;
-
-         double rel_ax = x(A_x) / MAP_SCALE + x(g_x);
-         double rel_ay = -x(A_y) / MAP_SCALE + x(g_y);
-         double rel_az = -x(A_z) / MAP_SCALE + x(g_z);
-
-         // signs randomly inverted until gravity vector became semi-stable
-         Quaternion<double> q(sF->rot_w, -sF->rot_x, sF->rot_y, sF->rot_z);
-         Quaternion<double> accel(0, rel_ax, rel_ay, rel_az);
-
-         Quaternion<double> rotated = q * accel * q.inverse();
-
-         ret <<
-           rotated.x() / 9.81 * 9.69,
-           rotated.y() / 9.81 * 9.676,
-           rotated.z() / 9.81 * 9.00;
-         return ret;
-       }, observation);
-
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
-       sF->state().x(g_x),
-       sF->state().x(g_y),
-       sF->state().x(g_z));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
-       sF->state().x(A_x),
-       sF->state().x(A_y),
-       sF->state().x(A_z));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(aXYZ): %lf %lf %lf",
-       sF->state().P(A_x, A_x),
-       sF->state().P(A_y, A_y),
-       sF->state().P(A_z, A_z));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sF->state().x(MapScale));
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sF->state().P(MapScale, MapScale));
 }
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processGyroscope
@@ -515,45 +550,17 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processGyroscope
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "gyr data XYZ: %f %f %f",
       xyzData[0], xyzData[1], xyzData[2]);
 
-  Matrix<double, 3, 1> observation;
-  observation << xyzData[0], xyzData[1], xyzData[2];
+  RecordedGyroscopeEvent *record = new RecordedGyroscopeEvent(time_nano, xyzData);
+  events.lock()->push_back(record);
 
   env->ReleaseFloatArrayElements(xyz, xyzData, 0);
-
-  long long int middle_time = 0;
-  {
-    auto sF = sensorFusion->lock();
-    middle_time = (time_nano + sF->timestamp) / 2;
-
-    __android_log_print(ANDROID_LOG_INFO, "Tracker", "sensorFusionTimestamp: %lld", sF->timestamp);
-    __android_log_print(ANDROID_LOG_INFO, "Tracker", "middle_time: %lld", middle_time);
-    __android_log_print(ANDROID_LOG_INFO, "Tracker", "time_nano: %lld", time_nano);
-  }
-
-  updateKalmanFilter(middle_time);
-
-  {
-    auto sF = sensorFusion->lock();
-
-    sF->update<3>(gyroscopeMeasureNoise, gyroscopeMeasureNoiseCovariance,
-        [](const V &x) -> Matrix<double, 3, 1> {
-          Matrix<double, 3, 1> ret;
-          ret <<
-            x(rotv_x),
-            x(rotv_y),
-            x(rotv_z);
-          return ret;
-        }, observation);
-  }
-
-  updateKalmanFilter(time_nano);
-
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "time_nano: %lld", time_nano);
 }
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1getTransformation
   (JNIEnv *env, jclass, jlong time_nano, jfloatArray transformation) {
   if(!trackingEstablished) return;
+
+  __android_log_print(ANDROID_LOG_INFO, "Tracker", "Starting event playback...");
 
   SensorFusion tmp(V::Zero(), M::Zero());
   {
@@ -561,18 +568,33 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1getTransformatio
     tmp = *sF;
   }
 
-  while(tmp.timestamp < time_nano) {
-    // maybe also replay gyro history?
+  auto ev = events.lock();
 
-    const long int dt_int = std::min(time_nano - tmp.timestamp, 10000000ll);
-    const double dt = dt_int / 100000000.0;
-    tmp.predict(predictionNoise, predictionNoiseCovariance, sensorModelRungeKutta(dt));
-    tmp.predictRot(dt);
+  std::sort(ev->begin(), ev->end(),
+    [](const RecordedEvent *const a, const RecordedEvent *const b) -> bool {
+      return a->timestamp < b->timestamp;
+    });
 
-    tmp.timestamp += dt_int;
+  auto start = ev->begin();
+  while(start != ev->end() && (*start)->timestamp < tmp.timestamp) ++start;
+
+  auto end = start;
+  while(end != ev->end() && (*end)->timestamp < time_nano) {
+    (*end)->applyTo(tmp);
+    ++end;
   }
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "est. XYZ: %lf %lf %lf",
+  // Don't waste CPU trying to record trace after camera tracking lost
+  if(ev->size() > 100) start = ev->end();
+
+  for(auto i = ev->begin(); i != start; ++i) delete *i;
+  ev->erase(
+     std::move(start, ev->end(), ev->begin()),
+     ev->end()
+  );
+
+  __android_log_print(ANDROID_LOG_INFO, "Tracker", "event queue: %d, est. XYZ: %lf %lf %lf",
+      ev->size(),
       tmp.state().x(X_x),
       tmp.state().x(X_y),
       tmp.state().x(X_z));

@@ -20,11 +20,13 @@ public class CameraTracker {
 
   public void processFrame() {
 		long start = System.nanoTime();
-		float[] transformation = new float[7];
 		VideoFrame lastFrame = history.getLastFrame();
 
 		Log.e("AR", "Camera processing on thread: " + Thread.currentThread().getName());
-		SVO_processFrame(lastFrame.getIntensities(), transformation, lastFrame.getTimestamp());
+		SVO_processFrame(lastFrame.getIntensities(), lastFrame.getTimestamp());
+
+		float[] transformation = new float[7];
+		SVO_getTransformation(lastFrame.getTimestamp(), transformation);
 		lastFrame.setTransformation(transformation);
 
 		long end = System.nanoTime();
@@ -55,7 +57,7 @@ public class CameraTracker {
      System.loadLibrary("cameratracker");
   }
 	public native static void SVO_prepare(int width, int height, float fx, float fy, double cx, double cy);
-	public native static void SVO_processFrame(float[] intensities, float[] transformation, long time_nano);
+	public native static void SVO_processFrame(float[] intensities, long time_nano);
 	public native static void SVO_processAccelerometer(float[] xyz, long time_nano);
 	public native static void SVO_processGyroscope(float[] xyz, long time_nano);
 	public native static void SVO_getTransformation(long time_nano, float[] transformation);

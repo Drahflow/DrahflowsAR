@@ -18,6 +18,7 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 import android.app.Activity;
 import android.opengl.GLSurfaceView;
+import android.opengl.GLES10;
 import android.opengl.GLES20;
 import android.opengl.GLES30;
 import android.opengl.GLES11Ext;
@@ -50,6 +51,8 @@ import java.io.FileOutputStream;
 import android.media.Image;
 import android.media.ImageReader;
 import android.graphics.ImageFormat;
+import javax.microedition.khronos.egl.EGL10;
+import javax.microedition.khronos.egl.EGLDisplay;
 
 public class DrahflowsAR extends Activity {
 	private GLSurfaceView mainView;
@@ -99,6 +102,30 @@ public class DrahflowsAR extends Activity {
 		mainRenderer = new DevelopmentRenderer(width, height);
 		mainView = new GLSurfaceView(this);
 		mainView.setEGLContextClientVersion(2);
+		mainView.setEGLConfigChooser(new GLSurfaceView.EGLConfigChooser() {
+			public EGLConfig chooseConfig(EGL10 egl, EGLDisplay display) {
+				int[] ret = new int[1];
+				EGLConfig[] configs = new EGLConfig[64];
+
+				int[] configSpec = {
+					EGL10.EGL_RED_SIZE, 8,
+					EGL10.EGL_GREEN_SIZE, 8,
+					EGL10.EGL_BLUE_SIZE, 8,
+					EGL10.EGL_ALPHA_SIZE, 8,
+					EGL10.EGL_DEPTH_SIZE, 16,
+					EGL10.EGL_RENDERABLE_TYPE, 4,
+					EGL10.EGL_SAMPLE_BUFFERS, 1,
+					EGL10.EGL_SAMPLES, 4,
+					EGL10.EGL_NONE
+				};
+
+				egl.eglChooseConfig(display, configSpec, configs, configs.length, ret);
+
+				Log.e("AR", "Available GL configs: " + ret[0]);
+				
+				return configs[0];
+			}
+		});
 		mainView.setRenderer(mainRenderer);
 		setContentView(mainView);
 		cameraReader = ImageReader.newInstance(camera_width, camera_height, ImageFormat.YUV_420_888, 4);
@@ -289,10 +316,10 @@ public class DrahflowsAR extends Activity {
 				 1,  1, -1,  -1,  1, -1,
 				-1,  1, -1,  -1, -1, -1,
 
-				-1, -1, -1,  -1, -1,  1,  
-				 1, -1, -1,   1, -1,  1,  
-				 1,  1, -1,   1,  1,  1,  
-				-1,  1, -1,  -1,  1,  1,  
+				-1, -1, -1,  -1, -1,  1,
+				 1, -1, -1,   1, -1,  1,
+				 1,  1, -1,   1,  1,  1,
+				-1,  1, -1,  -1,  1,  1,
 
 				-1, -1,  1,   1, -1,  1,
 				 1, -1,  1,   1,  1,  1,
@@ -373,7 +400,7 @@ public class DrahflowsAR extends Activity {
 				1.0f, 1.0f,
 				1.0f, 0.0f,				
 				
-				// Right face 
+				// Right face
 				0.0f, 0.0f, 				
 				0.0f, 1.0f,
 				1.0f, 0.0f,
@@ -381,7 +408,7 @@ public class DrahflowsAR extends Activity {
 				1.0f, 1.0f,
 				1.0f, 0.0f,	
 				
-				// Back face 
+				// Back face
 				0.0f, 0.0f, 				
 				0.0f, 1.0f,
 				1.0f, 0.0f,
@@ -389,7 +416,7 @@ public class DrahflowsAR extends Activity {
 				1.0f, 1.0f,
 				1.0f, 0.0f,	
 				
-				// Left face 
+				// Left face
 				0.0f, 0.0f, 				
 				0.0f, 1.0f,
 				1.0f, 0.0f,
@@ -397,7 +424,7 @@ public class DrahflowsAR extends Activity {
 				1.0f, 1.0f,
 				1.0f, 0.0f,	
 				
-				// Top face 
+				// Top face
 				0.0f, 0.0f, 				
 				0.0f, 1.0f,
 				1.0f, 0.0f,
@@ -405,7 +432,7 @@ public class DrahflowsAR extends Activity {
 				1.0f, 1.0f,
 				1.0f, 0.0f,	
 				
-				// Bottom face 
+				// Bottom face
 				0.0f, 0.0f, 				
 				0.0f, 1.0f,
 				1.0f, 0.0f,
@@ -580,6 +607,9 @@ public class DrahflowsAR extends Activity {
 			// Model transformations
 			Matrix.translateM(modelMatrix, 0, x, y, z);
 			Matrix.scaleM(modelMatrix, 0, scale, scale, scale);
+
+			float alpha = System.nanoTime() / 1000000000.0f;
+			Matrix.rotateM(modelMatrix, 0, alpha * 20, 1f, 1f, 1f);
 
 			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
 			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);

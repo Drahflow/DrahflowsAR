@@ -12,7 +12,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1prepare
   (JNIEnv *, jclass, jint, jint, jfloat, jfloat, jdouble, jdouble);
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
-  (JNIEnv *, jclass, jfloatArray, jfloatArray, jlong);
+  (JNIEnv *, jclass, jfloatArray, jlong);
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerometer
   (JNIEnv *, jclass, jfloatArray, jlong);
