@@ -57,7 +57,6 @@ static vk::AbstractCamera *camera;
 static int cameraWidth;
 static int cameraHeight;
 static svo::FrameHandlerMono *frameHandler;
-static double frameTime; // TODO: Forward from real camera
 static unsigned char *intensitiesBuffer;
 static std::mutex sensorFusionLock;
 
@@ -159,7 +158,6 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1prepare
       0.1272545, -0.4216122, -0.0006996348, -0.014160222, 0.61963481);
   frameHandler = new svo::FrameHandlerMono(camera);
   frameHandler->start();
-  frameTime = 0;
   trackingEstablished = false;
 
   intensitiesBuffer = new unsigned char[cameraWidth * cameraHeight];
@@ -341,7 +339,8 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
 
   #if DUMP_IMAGE
   char nameBuf[128];
-  sprintf(nameBuf, "/sdcard/svo.%04d.raw", (int)(frameTime * 200));
+  static int frameNumber = 0;
+  sprintf(nameBuf, "/sdcard/svo.%04d.raw", frameNumber++);
   int fd = open(nameBuf, O_CREAT | O_TRUNC | O_WRONLY);
   if(fd > 0) {
     write(fd, intensitiesBuffer, cameraWidth * cameraHeight);
@@ -350,7 +349,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
   #endif
 
   cv::Mat img(cameraHeight, cameraWidth, CV_8UC1, intensitiesBuffer);
-  frameHandler->addImage(img, frameTime += 0.01);
+  frameHandler->addImage(img, time_nano / 1000000000.0f);
 
   env->ReleaseFloatArrayElements(intensities, intensitiesData, 0);
 
