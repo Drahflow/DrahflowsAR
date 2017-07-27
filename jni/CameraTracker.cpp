@@ -331,7 +331,10 @@ static void saveTransformation(JNIEnv *env, SensorFusion &filter, jfloatArray tr
 JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
   (JNIEnv *env, jclass, jfloatArray intensities, jlong time_nano) {
   // trackingEstablished = true;
-  // updateKalmanFilter(time_nano);
+  // if(!sensorFusion) initializeKalmanFilter(time_nano);
+
+  // auto sF = sensorFusion->lock();
+  // updateKalmanFilter(*sF, time_nano - 200000000);
   // return; // This + above lines are FIXME to explore dead reckoning quality
 
   jsize intensitiesLen = env->GetArrayLength(intensities);
@@ -494,10 +497,6 @@ class RecordedGyroscopeEvent: public RecordedEvent {
       // TODO: Evaluate whether this actually improves things.
       const long long int middle_time = (timestamp + sF.timestamp) / 2;
 
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "sensorFusionTimestamp: %lld", sF.timestamp);
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "middle_time: %lld", middle_time);
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "time_nano: %lld", timestamp);
-
       updateKalmanFilter(sF, middle_time);
 
       sF.update<3>(gyroscopeMeasureNoise, gyroscopeMeasureNoiseCovariance,
@@ -511,8 +510,6 @@ class RecordedGyroscopeEvent: public RecordedEvent {
           }, observation);
 
       updateKalmanFilter(sF, timestamp);
-
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "time_nano: %lld", timestamp);
     }
 };
 
@@ -583,6 +580,8 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1getTransformatio
     (*end)->applyTo(tmp);
     ++end;
   }
+
+  updateKalmanFilter(tmp, time_nano);
 
   // Don't waste CPU trying to record trace after camera tracking lost
   if(ev->size() > 100) start = ev->end();

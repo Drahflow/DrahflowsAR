@@ -69,7 +69,7 @@ public class DrahflowsAR extends Activity {
 	private static final int camera_width = 640;
 	private static final int camera_height = 480;
 
-	private static final long DISPLAY_LAG_NS = 150000000;
+	private static final long DISPLAY_LAG_NS = 90000000;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
