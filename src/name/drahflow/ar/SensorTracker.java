@@ -9,7 +9,7 @@ import android.util.Log;
 import android.os.Handler;
 import android.os.HandlerThread;
 
-class ScaleEstimator {
+class SensorTracker {
 	private SensorManager sensorManager;
 	private Sensor accelerometer;
 	private SensorEventListener accelerometerListener;
@@ -23,7 +23,7 @@ class ScaleEstimator {
 
 	private ArrayList<float[]> sensorHistory = new ArrayList<>();
 
-	public ScaleEstimator(SensorManager _sensorManager, VideoHistory _video, CameraTracker _tracker) {
+	public SensorTracker(SensorManager _sensorManager, VideoHistory _video, CameraTracker _tracker) {
 		video = _video;
 		tracker = _tracker;
 

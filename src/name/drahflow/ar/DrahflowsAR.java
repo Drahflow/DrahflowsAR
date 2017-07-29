@@ -59,7 +59,7 @@ public class DrahflowsAR extends Activity {
 	private DevelopmentRenderer mainRenderer;
 	private VideoHistory videoHistory;
 	private CameraTracker cameraTracker;
-	private ScaleEstimator scaleEstimator;
+	private SensorTracker sensorTracker;
 
 	private static final int CAMERA_NOT_AVAILABLE = 0;
 	private static final int CAMERA_BOOTING = 1;
@@ -155,7 +155,7 @@ public class DrahflowsAR extends Activity {
 			}
 		}, mCameraHandler);
 
-		scaleEstimator = new ScaleEstimator((SensorManager)getSystemService(SENSOR_SERVICE), videoHistory, cameraTracker);
+		sensorTracker = new SensorTracker((SensorManager)getSystemService(SENSOR_SERVICE), videoHistory, cameraTracker);
 	}
 
 	private CameraDevice camera;
@@ -172,7 +172,7 @@ public class DrahflowsAR extends Activity {
 		new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_3D, false);
 
 		startCamera();
-		scaleEstimator.onResume();
+		sensorTracker.onResume();
 	}
 
 	protected void startCamera() {
@@ -268,7 +268,7 @@ public class DrahflowsAR extends Activity {
 		new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_2D, false);
 
 		stopCamera();
-		scaleEstimator.onPause();
+		sensorTracker.onPause();
 	}
 
 	protected void stopCamera() {
