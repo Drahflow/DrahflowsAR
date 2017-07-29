@@ -5,15 +5,10 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.ConfigurationInfo;
 import android.os.Bundle;
-import android.os.Looper;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Environment;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.util.Arrays;
-import java.util.ArrayList;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 import android.app.Activity;
@@ -35,22 +30,11 @@ import android.view.Surface;
 import android.view.Window;
 import android.hardware.SensorManager;
 import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraDevice;
-import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.TotalCaptureResult;
-import android.hardware.camera2.CaptureFailure;
-import android.hardware.camera2.CaptureResult;
-import android.hardware.camera2.params.RggbChannelVector;
 import com.epson.moverio.btcontrol.DisplayControl;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.FileOutputStream;
-import android.media.Image;
-import android.media.ImageReader;
-import android.graphics.ImageFormat;
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLDisplay;
 
@@ -60,11 +44,6 @@ public class DrahflowsAR extends Activity {
 	private VideoHistory videoHistory;
 	private CameraTracker cameraTracker;
 	private SensorTracker sensorTracker;
-
-	private static final int CAMERA_NOT_AVAILABLE = 0;
-	private static final int CAMERA_BOOTING = 1;
-	private static final int CAMERA_OPERATIONAL = 2;
-	private int cameraState;
 
 	private static final int camera_width = 640;
 	private static final int camera_height = 480;
@@ -91,14 +70,7 @@ public class DrahflowsAR extends Activity {
 
 		final int width = camera_width;
 		final int height = camera_height;
-		cameraState = CAMERA_NOT_AVAILABLE;
 
-		mCameraThread = new HandlerThread("Camera Processing");
-		mCameraThread.start();
-		mCameraHandler = new Handler(mCameraThread.getLooper());
-
-		videoHistory = new VideoHistory(width, height, camera_width, camera_height, 30l * 1000l * 1000l * 1000l);
-		cameraTracker = new CameraTracker(width, height, videoHistory);
 		mainRenderer = new DevelopmentRenderer(width, height);
 		mainView = new GLSurfaceView(this);
 		mainView.setEGLContextClientVersion(2);
@@ -128,40 +100,11 @@ public class DrahflowsAR extends Activity {
 		});
 		mainView.setRenderer(mainRenderer);
 		setContentView(mainView);
-		cameraReader = ImageReader.newInstance(camera_width, camera_height, ImageFormat.YUV_420_888, 4);
-		cameraReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
-			@Override
-			public void onImageAvailable(ImageReader cameraReader) {
-				Image frame = cameraReader.acquireLatestImage();
-				if(frame == null) return;
 
-				videoHistory.addFrame(frame);
-				frame.close();
-
-				Log.e("AR", "Camera state: " + cameraState);
-				if(cameraState != CAMERA_OPERATIONAL) {
-					// camera not initialized fully, yet
-					if(cameraState == CAMERA_BOOTING && videoHistory.size() > 10) {
-						videoHistory.clear();
-						cameraState = CAMERA_OPERATIONAL;
-					}
-					return;
-				} else if(videoHistory.size() < 3) {
-					// algorithms need 3 frames at least
-					return;
-				}
-
-				cameraTracker.processFrame();
-			}
-		}, mCameraHandler);
-
+		videoHistory = new VideoHistory(width, height, camera_width, camera_height, 30l * 1000l * 1000l * 1000l);
+		cameraTracker = new CameraTracker((CameraManager)getSystemService(CAMERA_SERVICE), width, height, videoHistory);
 		sensorTracker = new SensorTracker((SensorManager)getSystemService(SENSOR_SERVICE), videoHistory, cameraTracker);
 	}
-
-	private CameraDevice camera;
-	private HandlerThread mCameraThread;
-	private Handler mCameraHandler;
-	private ImageReader cameraReader;
 
 	@Override
 	protected void onResume() {
@@ -171,92 +114,8 @@ public class DrahflowsAR extends Activity {
 		mainView.onResume();
 		new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_3D, false);
 
-		startCamera();
+		cameraTracker.onResume();
 		sensorTracker.onResume();
-	}
-
-	protected void startCamera() {
-		cameraState = CAMERA_NOT_AVAILABLE;
-
-		CameraManager cameraManager = (CameraManager)getSystemService(Context.CAMERA_SERVICE);
-		try {
-			String[] cameras = cameraManager.getCameraIdList();
-
-			for(int i = 0; i < cameras.length; ++i) {
-				Log.e("AR", "Camera: " + cameras[i]);
-			}
-
-			cameraManager.openCamera(cameras[0], new CameraDevice.StateCallback() {
-				public void onOpened(CameraDevice c) {
-					camera = c;
-
-					final Surface surface = cameraReader.getSurface();
-
-					try {
-						c.createCaptureSession(Arrays.asList(surface),
-								new CameraCaptureSession.StateCallback() {
-									@Override
-									public void onConfigured(CameraCaptureSession cameraCaptureSession) {
-										// The camera is already closed
-										if (camera == null) {
-											return;
-										}
-
-										try {
-											// Finally, we start displaying the camera preview.
-											CaptureRequest.Builder captureRequestBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-											captureRequestBuilder.addTarget(surface);
-											captureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO);
-											captureRequestBuilder.set(CaptureRequest.COLOR_CORRECTION_MODE, CaptureRequest.COLOR_CORRECTION_MODE_TRANSFORM_MATRIX);
-											captureRequestBuilder.set(CaptureRequest.COLOR_CORRECTION_GAINS, new RggbChannelVector(20.0f, 5.0f, 5.0f, 5.0f));
-											captureRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, 20000000l);  // in usecs
-											captureRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, 50000);
-											CaptureRequest captureRequest = captureRequestBuilder.build();
-
-											cameraCaptureSession.setRepeatingRequest(captureRequest, new CameraCaptureSession.CaptureCallback() {
-												public void onCaptureBufferLost(CameraCaptureSession session, CaptureRequest request, Surface target, long frameNumber) { }
-												public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) { }
-												public void onCaptureFailed(CameraCaptureSession session, CaptureRequest request, CaptureFailure failure) { }
-												public void onCaptureProgressed(CameraCaptureSession session, CaptureRequest request, CaptureResult partialResult) { }
-												public void onCaptureSequenceAborted(CameraCaptureSession session, int sequenceId) { }
-												public void onCaptureSequenceCompleted(CameraCaptureSession session, int sequenceId, long frameNumber) { }
-												public void onCaptureStarted(CameraCaptureSession session, CaptureRequest request, long timestamp, long frameNumber) {
-													if(cameraState == CAMERA_NOT_AVAILABLE) {
-														cameraState = CAMERA_BOOTING;
-													}
-												}
-											}, mCameraHandler);
-										} catch (CameraAccessException e) {
-											e.printStackTrace();
-										}
-									}
-
-									@Override
-									public void onConfigureFailed(CameraCaptureSession cameraCaptureSession) {
-										Log.e("AR", "Capture Config failed");
-									}
-								},
-								null);
-					} catch (CameraAccessException e) {
-						e.printStackTrace();
-					}
-				}
-
-				public void onError(CameraDevice c, int error) {
-					c.close();
-					camera = null;
-				}
-				public void onDisconnected(CameraDevice c) {
-					c.close();
-					camera = null;
-				}
-				public void onClosed(CameraDevice c) {
-					camera = null;
-				}
-			}, mCameraHandler);
-		} catch(CameraAccessException cae) {
-			throw new Error("May not open camera", cae);
-		}
 	}
 
 	@Override
@@ -267,14 +126,8 @@ public class DrahflowsAR extends Activity {
 		mainView.onPause();
 		new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_2D, false);
 
-		stopCamera();
+		cameraTracker.onPause();
 		sensorTracker.onPause();
-	}
-
-	protected void stopCamera() {
-		if(camera != null) {
-			camera.close();
-		}
 	}
 
 	public class DevelopmentRenderer implements GLSurfaceView.Renderer {
