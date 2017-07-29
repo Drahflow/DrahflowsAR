@@ -22,13 +22,10 @@ class ScaleEstimator {
 	private Handler sensorHandler;
 
 	private ArrayList<float[]> sensorHistory = new ArrayList<>();
-	private float xScale, yScale, zScale;
 
 	public ScaleEstimator(SensorManager _sensorManager, VideoHistory _video, CameraTracker _tracker) {
 		video = _video;
 		tracker = _tracker;
-
-		xScale = yScale = zScale = 1.0f;
 
 		sensorThread = new HandlerThread("Sensor Processing");
 		sensorThread.start();
@@ -68,53 +65,5 @@ class ScaleEstimator {
 	public void onPause() {
 		sensorManager.unregisterListener(accelerometerListener);
 		sensorManager.unregisterListener(gyroscopeListener);
-	}
-	
-	private final static float EPSILON = 1e-6f;
-	
-	private void calibrateAccelerometer() {
-		// xScale = yScale = zScale = 1.0f;
-		// \sum_i sqrt(A * h_i.x^2 + B * h_i.y^2 + C * h_i.z^2) = i * 9.81m^2
-		final float stepSize = 0.01f / sensorHistory.size();
-
-		Log.e("AR", "Running calibration");
-		// TODO: put real optimization algorithm in here
-		final float expectedTotal = sensorHistory.size() * 9.805f;
-		for(int i = 0; i < 100; ++i) {
-			float total = calculateTotalAcceleration(xScale, yScale, zScale);
-			float total_dx = calculateTotalAcceleration(xScale + EPSILON, yScale, zScale) - 
-				calculateTotalAcceleration(xScale - EPSILON, yScale, zScale);
-			float total_dy = calculateTotalAcceleration(xScale, yScale + EPSILON, zScale) -
-				calculateTotalAcceleration(xScale, yScale - EPSILON, zScale);
-			float total_dz = calculateTotalAcceleration(xScale, yScale, zScale + EPSILON) -
-				calculateTotalAcceleration(xScale, yScale, zScale - EPSILON);
-
-			float error = expectedTotal - total;
-			Log.e("AR", String.format("calibration error: %8.6f", error));
-
-			float length = (float)(Math.sqrt(total_dx * total_dx + total_dy * total_dy + total_dz * total_dz));
-			float dist = error / length;
-
-			xScale += stepSize * dist * total_dx;
-			yScale += stepSize * dist * total_dy;
-			zScale += stepSize * dist * total_dz;
-
-			Log.e("AR", String.format("calibration %d: %8.6f,%8.6f,%8.6f", i, xScale, yScale, zScale));
-		}
-
-		sensorHistory.clear();
-	}
-
-	private float calculateTotalAcceleration(float sx, float sy, float sz) {
-		float sum = 0.0f;
-		sx *= sx;
-		sy *= sy;
-		sz *= sz;
-
-		for(float[] a: sensorHistory) {
-			sum += (float)(Math.sqrt(sx * a[0] * a[0] + sy * a[1] * a[1] + sz * a[2] * a[2]));
-		}
-
-		return sum;
 	}
 }
