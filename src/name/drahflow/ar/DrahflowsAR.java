@@ -31,10 +31,8 @@ import android.view.MotionEvent;
 
 public class DrahflowsAR extends Activity {
 	private GLSurfaceView mainView;
-	private VideoHistory videoHistory;
-	private CameraTracker cameraTracker;
-	private SensorTracker sensorTracker;
 	private ArActivity activity;
+	private GlobalState global = new GlobalState();
 
 	private static final int camera_width = 640;
 	private static final int camera_height = 480;
@@ -56,9 +54,6 @@ public class DrahflowsAR extends Activity {
 		if(!supportsEs2) {
 			throw new RuntimeException("ES2 not supported, this is hopeless");
 		}
-
-		final int width = camera_width;
-		final int height = camera_height;
 
 		mainView = new GLSurfaceView(this) {
 			public boolean onTouchEvent(MotionEvent e) {
@@ -98,11 +93,14 @@ public class DrahflowsAR extends Activity {
 		});
 		setContentView(mainView);
 
-		videoHistory = new VideoHistory(width, height, camera_width, camera_height, 30l * 1000l * 1000l * 1000l);
-		cameraTracker = new CameraTracker((CameraManager)getSystemService(CAMERA_SERVICE), width, height, videoHistory);
-		sensorTracker = new SensorTracker((SensorManager)getSystemService(SENSOR_SERVICE), videoHistory, cameraTracker);
+		final int width = camera_width;
+		final int height = camera_height;
+		global.videoHistory = new VideoHistory(width, height, camera_width, camera_height, 30l * 1000l * 1000l * 1000l);
+		global.cameraTracker = new CameraTracker((CameraManager)getSystemService(CAMERA_SERVICE), width, height, global.videoHistory);
+		global.sensorTracker = new SensorTracker((SensorManager)getSystemService(SENSOR_SERVICE), global.videoHistory, global.cameraTracker);
+		global.gestureTracker = new GestureTracker();
 
-		switchTo(new GreenCubesActivity(width, height, cameraTracker, videoHistory));
+		switchTo(new MainMenuActivity(global));
 	}
 
 	public void switchTo(ArActivity new_activity) {
@@ -122,8 +120,7 @@ public class DrahflowsAR extends Activity {
 		mainView.onResume();
 		new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_3D, false);
 
-		cameraTracker.onResume();
-		sensorTracker.onResume();
+		global.onResume();
 		activity.onResume();
 	}
 
@@ -135,8 +132,7 @@ public class DrahflowsAR extends Activity {
 		mainView.onPause();
 		new DisplayControl(this).setMode(DisplayControl. DISPLAY_MODE_2D, false);
 
-		cameraTracker.onPause();
-		sensorTracker.onPause();
 		activity.onPause();
+		global.onPause();
 	}
 }

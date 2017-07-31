@@ -176,6 +176,11 @@ public class CameraTracker {
 	public void onPause() { stopCamera(); }
 	public void onResume() { startCamera(); }
 
+	public boolean isTrackingEstablished() {
+		// FIXME: Actually report _tracking_ not just camera online
+		return cameraState == CameraState.CAMERA_OPERATIONAL;
+	}
+
   public void processFrame() {
 		long start = System.nanoTime();
 		VideoFrame lastFrame = history.getLastFrame();
