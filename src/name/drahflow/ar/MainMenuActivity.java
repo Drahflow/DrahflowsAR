@@ -18,6 +18,7 @@ public class MainMenuActivity implements ArActivity {
 	private int width;
 	private int height;
 	private float mouseX, mouseY;
+	private Float mouseDownX, mouseDownY;
 
 	public void onTouchEvent(MotionEvent e) {
 		Log.e("AR", "TouchEvent: " + e);
@@ -35,6 +36,23 @@ public class MainMenuActivity implements ArActivity {
 
 		mouseX = x / width / 1.6f;
 		mouseY = -y / height / 5.4f;
+
+		if((e.getActionMasked() & MotionEvent.ACTION_DOWN) != 0) {
+			mouseDownX = mouseX;
+			mouseDownY = mouseY;
+		}
+
+		if((e.getActionMasked() & MotionEvent.ACTION_UP) != 0) {
+			if(mouseDownX != null && mouseDownY != null) {
+				float dx = mouseDownX - mouseX;
+				float dy = mouseDownY - mouseY;
+				if(dx * dx + dy * dy < 0.01f) {
+					for(MenuElement me: menuElements) {
+						if(me.isHit(mouseDownX, mouseDownY)) me.onClick();
+					}
+				}
+			}
+		}
 	}
 
 	public void onPause() {};
@@ -53,6 +71,60 @@ public class MainMenuActivity implements ArActivity {
 		renderer = new Renderer();
 	}
 
+	abstract class MenuElement {
+		float x, y, s;
+
+		protected void draw(Renderer r, float[] color) {
+			r.drawRect(x, y, -1f, s, color);
+		}
+
+		public boolean isHit(float mx, float my) {
+			return mx > x - s && mx < x + s &&
+					my > y - s && my > y + s;
+		}
+
+		abstract public void draw(Renderer r);
+		abstract public void onClick();
+	}
+
+	private final float[] RED = new float[] { 1f, 0f, 0f, 0f };
+	private final float[] GREEN = new float[] { 0f, 1f, 0f, 0f };
+
+	private MenuElement[] menuElements = new MenuElement[] {
+		new MenuElement() {
+			{ x = 0f; y = 0.05f; s = 0.01f; }
+
+			public void draw(Renderer r) {
+				draw(r, global.cameraTracker.isTrackingEstablished()? GREEN: RED);
+			}
+			public void onClick() {
+				// TODO: (re-)initialize camera tracking
+			}
+		},
+		new MenuElement() {
+			{ x = 0f; y = 0.00f; s = 0.01f; }
+
+			public void draw(Renderer r) {
+				draw(r, global.gestureTracker.isTrackingEstablished()? GREEN: RED);
+			}
+			public void onClick() {
+				// TODO: (re-)initialize gesture tracking
+			}
+		},
+		new MenuElement() {
+			{ x = 0f; y = -0.05f; s = 0.01f; }
+
+			public void draw(Renderer r) {
+				draw(r,
+						global.cameraTracker.isTrackingEstablished() &&
+						global.gestureTracker.isTrackingEstablished()? GREEN: RED);
+			}
+			public void onClick() {
+				// TODO: activate main AR Activity
+			}
+		}
+	};
+	
 	private class Renderer implements GLSurfaceView.Renderer {
 		private FloatBuffer rectPositions;
 		private int positionHandle;
@@ -154,23 +226,16 @@ public class MainMenuActivity implements ArActivity {
 			drawScene();
 		}
 
-		private final float[] RED = new float[] { 1f, 0f, 0f, 0f };
-		private final float[] GREEN = new float[] { 0f, 1f, 0f, 0f };
 		private final float[] MOUSE = new float[] { 0.7f, 0.7f, 0.7f, 0f };
-
 		private void drawScene() {
-			final boolean hasLocation = global.cameraTracker.isTrackingEstablished();
-			final boolean hasGesture = global.gestureTracker.isTrackingEstablished();
-
-			drawRect(0f, 0.05f, -1f, 0.01f, hasLocation? GREEN: RED);
-			drawRect(0f, 0f, -1f, 0.01f, hasGesture? GREEN: RED);
-
-			drawRect(0f, -0.05f, -1f, 0.01f, hasLocation && hasGesture? GREEN: RED);
+			for(MenuElement e: menuElements) {
+				e.draw(this);
+			}
 
 			drawRect(mouseX, mouseY, -1f, 0.002f, MOUSE);
 		}
-		
-		private void drawRect(float x, float y, float z, float scale, float[] color) {
+
+		public void drawRect(float x, float y, float z, float scale, float[] color) {
 			Matrix.setIdentityM(modelMatrix, 0);
 
 			GLES20.glUseProgram(linkedShaderHandle);
