@@ -81,7 +81,7 @@ public class CameraTracker {
 		}, cameraHandler);
 
 		// TODO: drop (or forward) unused calibration parameters
-		SVO_prepare(width, height, 0.0f, 0.0f, 0.0, 0.0);
+		JNI.SVO_prepare(width, height, 0.0f, 0.0f, 0.0, 0.0);
 	}
 
 	private void startCamera() {
@@ -186,10 +186,10 @@ public class CameraTracker {
 		VideoFrame lastFrame = history.getLastFrame();
 
 		Log.e("AR", "Camera processing on thread: " + Thread.currentThread().getName());
-		SVO_processFrame(lastFrame.getIntensities(), lastFrame.getTimestamp());
+		JNI.SVO_processFrame(lastFrame.getIntensities(), lastFrame.getTimestamp());
 
 		float[] transformation = new float[7];
-		SVO_getTransformation(lastFrame.getTimestamp(), transformation);
+		JNI.SVO_getTransformation(lastFrame.getTimestamp(), transformation);
 		lastFrame.setTransformation(transformation);
 
 		long end = System.nanoTime();
@@ -198,30 +198,21 @@ public class CameraTracker {
 
 	public void processAccelerometerEvent(SensorEvent e) {
 		Log.e("AR", "Accelerometer processing on thread: " + Thread.currentThread().getName());
-		SVO_processAccelerometer(e.values, e.timestamp);
+		JNI.SVO_processAccelerometer(e.values, e.timestamp);
 	}
 
 	public void processGyroscopeEvent(SensorEvent e) {
 		Log.e("AR", "Gyroscope processing on thread: " + Thread.currentThread().getName());
-		SVO_processGyroscope(e.values, e.timestamp);
+		JNI.SVO_processGyroscope(e.values, e.timestamp);
 	}
 
 	public void getTransformationAt(long time_nano, float[] transformation) {
 		Log.e("AR", "Pose estimation on thread: " + Thread.currentThread().getName());
-		SVO_getTransformation(time_nano, transformation);
+		JNI.SVO_getTransformation(time_nano, transformation);
 
 		Log.e("AR", "pose: " +
 				String.format("%8.6f,%8.6f,%8.6f @ %8.6f,%8.6f,%8.6f,%8.6f",
 					transformation[0], transformation[1], transformation[2],
 					transformation[3], transformation[4], transformation[5], transformation[6]));
 	}
-
-  static {
-     System.loadLibrary("cameratracker");
-  }
-	public native static void SVO_prepare(int width, int height, float fx, float fy, double cx, double cy);
-	public native static void SVO_processFrame(float[] intensities, long time_nano);
-	public native static void SVO_processAccelerometer(float[] xyz, long time_nano);
-	public native static void SVO_processGyroscope(float[] xyz, long time_nano);
-	public native static void SVO_getTransformation(long time_nano, float[] transformation);
 }

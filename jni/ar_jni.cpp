@@ -1,5 +1,5 @@
 #include <jni.h>
-#include "CameraTracker.h"
+#include "ar_jni.h"
 
 #include <svo/config.h>
 #include <svo/frame_handler_mono.h>
@@ -161,7 +161,7 @@ static Matrix<double, 3, 1> gyroscopeMeasureNoise;
 static Matrix<double, 3, 3> gyroscopeMeasureNoiseCovariance;
 static bool trackingEstablished;
 
-JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1prepare
+JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1prepare
   (JNIEnv *, jclass, jint width, jint height, jfloat, jfloat, jdouble, jdouble) {
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "Tracker starting...");
 
@@ -328,7 +328,7 @@ static void saveTransformation(JNIEnv *env, SensorFusion &filter, jfloatArray tr
   env->ReleaseFloatArrayElements(transformation, transformationData, 0);
 }
 
-JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processFrame
+JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1processFrame
   (JNIEnv *env, jclass, jfloatArray intensities, jlong time_nano) {
   // trackingEstablished = true;
   // if(!sensorFusion) initializeKalmanFilter(time_nano);
@@ -513,7 +513,7 @@ class RecordedGyroscopeEvent: public RecordedEvent {
     }
 };
 
-JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerometer
+JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1processAccelerometer
   (JNIEnv *env, jclass, jfloatArray xyz, jlong time_nano) {
    if(!trackingEstablished) return;
 
@@ -533,7 +533,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processAccelerom
    env->ReleaseFloatArrayElements(xyz, xyzData, 0);
 }
 
-JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processGyroscope
+JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1processGyroscope
   (JNIEnv *env, jclass, jfloatArray xyz, jlong time_nano) {
   if(!trackingEstablished) return;
 
@@ -553,7 +553,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1processGyroscope
   env->ReleaseFloatArrayElements(xyz, xyzData, 0);
 }
 
-JNIEXPORT void JNICALL Java_name_drahflow_ar_CameraTracker_SVO_1getTransformation
+JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1getTransformation
   (JNIEnv *env, jclass, jlong time_nano, jfloatArray transformation) {
   if(!trackingEstablished) return;
 

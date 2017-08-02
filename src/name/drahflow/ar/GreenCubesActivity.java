@@ -27,10 +27,10 @@ public class GreenCubesActivity implements ArActivity {
 	private VideoHistory videoHistory;
 	private CameraTracker cameraTracker;
 
-	public GreenCubesActivity(int width, int height, CameraTracker _cameraTracker, VideoHistory _videoHistory) {
-		cameraTracker = _cameraTracker;
-		videoHistory = _videoHistory;
-		renderer = new DevelopmentRenderer(width, height);
+	public GreenCubesActivity(GlobalState global) {
+		cameraTracker = global.cameraTracker;
+		videoHistory = global.videoHistory;
+		renderer = new DevelopmentRenderer(videoHistory.width, videoHistory.height);
 	}
 
 	public class DevelopmentRenderer implements GLSurfaceView.Renderer {
