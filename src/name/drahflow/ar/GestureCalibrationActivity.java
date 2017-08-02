@@ -14,49 +14,11 @@ import java.nio.FloatBuffer;
 import android.util.Log;
 import android.view.MotionEvent;
 
-public class MainMenuActivity implements ArActivity {
+public class GestureCalibrationActivity implements ArActivity {
 	private int width;
 	private int height;
-	private float mouseX, mouseY;
-	private Float mouseDownX, mouseDownY;
 
 	public void onTouchEvent(MotionEvent e) {
-		Log.e("AR", "TouchEvent: " + e);
-
-		float x = e.getAxisValue(MotionEvent.AXIS_X);
-		float y = e.getAxisValue(MotionEvent.AXIS_Y);
-		if(x > width / 2) {
-			x -= width / 1.82f;
-		} else {
-			x -= width / 6.2f;
-		}
-
-		x -= width / 4;
-		y -= height / 2;
-
-		mouseX = x / width / 1.6f;
-		mouseY = -y / height / 5.4f;
-
-		if((e.getActionMasked() == MotionEvent.ACTION_DOWN)) {
-			mouseDownX = mouseX;
-			mouseDownY = mouseY;
-		}
-
-		if((e.getActionMasked() == MotionEvent.ACTION_UP)) {
-			if(mouseDownX != null && mouseDownY != null) {
-				float dx = mouseDownX - mouseX;
-				float dy = mouseDownY - mouseY;
-
-				if(dx * dx + dy * dy < 0.01f) {
-					for(MenuElement me: menuElements) {
-						if(me.isHit(mouseDownX, mouseDownY)) {
-							me.onClick();
-							Log.e("AR", "Hit: " + me);
-						}
-					}
-				}
-			}
-		}
 	}
 
 	public void onPause() {};
@@ -69,68 +31,21 @@ public class MainMenuActivity implements ArActivity {
 
 	private GlobalState global;
 
-	public MainMenuActivity(GlobalState _global) {
+	public GestureCalibrationActivity(GlobalState _global) {
 		global = _global;
 
 		renderer = new Renderer();
 	}
 
-	abstract class MenuElement {
-		float x, y, s;
-
-		protected void draw(Renderer r, float[] color) {
-			r.drawRect(x, y, -1f, s, color);
-		}
-
-		public boolean isHit(float mx, float my) {
-			return mx > x - s && mx < x + s &&
-					my > y - s && my < y + s;
-		}
-
-		abstract public void draw(Renderer r);
-		abstract public void onClick();
-	}
-
 	private final float[] RED = new float[] { 1f, 0f, 0f, 0f };
 	private final float[] GREEN = new float[] { 0f, 1f, 0f, 0f };
 
-	private MenuElement[] menuElements = new MenuElement[] {
-		new MenuElement() {
-			{ x = 0f; y = 0.05f; s = 0.01f; }
+	private static FloatBuffer outputTextureBuffer;
+	private static float[] outputData;
 
-			public void draw(Renderer r) {
-				draw(r, global.cameraTracker.isTrackingEstablished()? GREEN: RED);
-			}
-			public void onClick() {
-				// TODO: (re-)initialize camera tracking
-			}
-		},
-		new MenuElement() {
-			{ x = 0f; y = 0.00f; s = 0.01f; }
-
-			public void draw(Renderer r) {
-				draw(r, global.gestureTracker.isTrackingEstablished()? GREEN: RED);
-			}
-			public void onClick() {
-				global.main.switchTo(new GestureCalibrationActivity(global));
-			}
-		},
-		new MenuElement() {
-			{ x = 0f; y = -0.05f; s = 0.01f; }
-
-			public void draw(Renderer r) {
-				draw(r,
-						global.cameraTracker.isTrackingEstablished() &&
-						global.gestureTracker.isTrackingEstablished()? GREEN: RED);
-			}
-			public void onClick() {
-				// TODO: activate main AR Activity
-			}
-		}
-	};
-	
 	private class Renderer implements GLSurfaceView.Renderer {
-		private FloatBuffer rectPositions;
+		private FloatBuffer quadPositions;
+		private FloatBuffer quadTexCoords;
 		private int positionHandle;
 		private int texCoordsHandle;
 
@@ -141,6 +56,7 @@ public class MainMenuActivity implements ArActivity {
 		private float[] mvMatrix = new float[16];
 		private int mvpMatrixHandle;
 		private int colorHandle;
+		private int texSamplerHandle;
 
 		private int linkedShaderHandle;
 
@@ -150,15 +66,22 @@ public class MainMenuActivity implements ArActivity {
 
 		private void loadModelData() {
 			float[] positions = {
-				-1, -1, 0,   1, -1, 0,
-				 1, -1, 0,   1,  1, 0,
-				 1,  1, 0,  -1,  1, 0,
-				-1,  1, 0,  -1, -1, 0,
+				-1, -1, 0,   1, -1, 0,   1,  1, 0,
+        -1, 1, 0,   -1, -1, 0,   1,  1, 0,
 			};
 
-			rectPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
+			quadPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
 					.order(ByteOrder.nativeOrder()).asFloatBuffer();
-			rectPositions.put(positions).position(0);
+			quadPositions.put(positions).position(0);
+
+			float[] texCoords = {
+				0, 1,    1, 1,     1, 0,
+				0, 0,    0, 1,     1, 0
+			};
+
+			quadTexCoords = ByteBuffer.allocateDirect(texCoords.length * Utils.BYTES_PER_FLOAT)
+					.order(ByteOrder.nativeOrder()).asFloatBuffer();
+			quadTexCoords.put(texCoords).position(0);
 		}
 
 		@Override
@@ -210,56 +133,119 @@ public class MainMenuActivity implements ArActivity {
 			colorHandle = GLES20.glGetUniformLocation(linkedShaderHandle, "u_Color");
 			positionHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_Position");
 			texCoordsHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_TexCoordinate");
+			texSamplerHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "u_TexImage");
 
 			GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
 			Utils.noGlError();
 
+			int[] cameraTexture = bindCameraTexture();
+
 			GLES20.glViewport(0, 0, width / 2, height);
 			Matrix.setLookAtM(viewMatrix, 0, eyeX - 0.10f, eyeY, eyeZ, lookX - 0.10f, lookY, lookZ, upX, upY, upZ);
-			drawEyeView();
+			drawEyeView(cameraTexture[0]);
 			Utils.noGlError();
 
 			GLES20.glViewport(width / 2, 0, width / 2, height);
 			Matrix.setLookAtM(viewMatrix, 0, eyeX - 0.03f, eyeY, eyeZ, lookX - 0.03f, lookY, lookZ, upX, upY, upZ);
-			drawEyeView();
+			drawEyeView(cameraTexture[0]);
 			Utils.noGlError();
+
+			GLES20.glDeleteTextures(1, cameraTexture, 0);
 		}
 
-		private void drawEyeView() {
-			drawScene();
+		private void drawEyeView(int cameraTexture) {
+			drawScene(cameraTexture);
 		}
 
-		private final float[] MOUSE = new float[] { 0.7f, 0.7f, 0.7f, 0f };
-		private void drawScene() {
-			for(MenuElement e: menuElements) {
-				e.draw(this);
+		private final float[] RED = new float[] { 1.0f, 0.0f, 0.0f, 0f };
+		private void drawScene(int cameraTexture) {
+			drawQuad(RED, cameraTexture);
+		}
+
+		private int[] bindCameraTexture() {
+			final int width = global.videoHistory.width;
+			final int height = global.videoHistory.height;
+
+			int[] someTexs = new int[1];
+			GLES20.glGenTextures(1, someTexs, 0);
+			int tmpTex = someTexs[0];
+
+			if(outputTextureBuffer == null) {
+				outputTextureBuffer = ByteBuffer.allocateDirect(4 * width * height * Utils.BYTES_PER_FLOAT)
+						.order(ByteOrder.nativeOrder()).asFloatBuffer();
+			  outputData = new float[width * height * 4];
 			}
 
-			drawRect(mouseX, mouseY, -1f, 0.002f, MOUSE);
+			float[] intensities = global.videoHistory.getLastFrame().getIntensities();
+
+			for(int i = 0; i < width * height; ++i) {
+				outputData[i * 4 + 0] = intensities[i];
+				outputData[i * 4 + 1] = intensities[i];
+				outputData[i * 4 + 2] = intensities[i];
+			}
+
+			int minX = (int)(width * 0.47f);
+			int maxX = (int)(width * 0.53f);
+			int minY = (int)(height * 0.4f);
+			int maxY = (int)(height * 0.6f);
+			for(int line_width = 0; line_width < 4; ++line_width) {
+				for(int ty = minY; ty < maxY; ++ty) {
+					int leftI = (minX - line_width + ty * width) * 4;
+					int rightI = (maxX + line_width + ty * width) * 4;
+
+					outputData[leftI] = 1;
+					outputData[rightI] = 1;
+				}
+
+				int targetX = width / 2;
+				int targetY = (int)(height * 0.35f);
+				outputData[(targetX + line_width + targetY * width) * 4 + 1] = 1;
+			}
+
+			outputTextureBuffer.position(0);
+			outputTextureBuffer.put(outputData);
+
+			outputTextureBuffer.position(0);
+			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tmpTex);
+			GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_FLOAT, outputTextureBuffer);
+			GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+			GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+
+			return someTexs;
 		}
 
-		public void drawRect(float x, float y, float z, float scale, float[] color) {
+		public void drawQuad(float[] color, int cameraTexture) {
 			Matrix.setIdentityM(modelMatrix, 0);
 
 			GLES20.glUseProgram(linkedShaderHandle);
 
 			// Pass in the position information
-			rectPositions.position(0);
+			quadPositions.position(0);
 			GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false,
-					0, rectPositions);
+					0, quadPositions);
 			GLES20.glEnableVertexAttribArray(positionHandle);
 
+			// Pass in texture information
+			quadTexCoords.position(0);
+			GLES20.glVertexAttribPointer(texCoordsHandle, 2, GLES20.GL_FLOAT, false,
+					0, quadTexCoords);
+			GLES20.glEnableVertexAttribArray(texCoordsHandle);
+
 			// Model transformations
-			Matrix.translateM(modelMatrix, 0, x, y, z);
-			Matrix.scaleM(modelMatrix, 0, scale, scale, scale);
+			Matrix.translateM(modelMatrix, 0, -0.06f, 0f, -1f);
+			Matrix.scaleM(modelMatrix, 0, 0.12f, 0.06f, 0.06f);
 
 			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
 			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
 			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
 			GLES20.glUniform4fv(colorHandle, 1, color, 0);
 
-			GLES20.glDrawArrays(GLES20.GL_LINES, 0, rectPositions.limit() / 3);
+			GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, cameraTexture);
+			GLES20.glUniform1i(texSamplerHandle, 0);
+
+			GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, quadPositions.limit() / 3);
 		}
 
 		protected String getVertexShader() {
@@ -267,11 +253,14 @@ public class MainMenuActivity implements ArActivity {
 				  "uniform mat4 u_MVPMatrix;      \n"
 				+ "uniform vec4 u_Color;          \n"
 				+ "attribute vec4 a_Position;     \n"
+				+ "attribute vec2 a_TexCoordinate;\n"
 				+ "varying vec4 v_Color;          \n"
+				+ "varying vec2 v_TexCoordinate;  \n"
 
 				+ "void main()                                \n"
 				+ "{                                          \n"
 				+ "   v_Color = u_Color;                      \n"
+				+ "   v_TexCoordinate = a_TexCoordinate;      \n"
 				+ "   gl_Position = u_MVPMatrix * a_Position; \n"
 				+ "}                                          \n";
 
@@ -281,9 +270,11 @@ public class MainMenuActivity implements ArActivity {
 		protected String getFragmentShader() {
 			final String perPixelFragmentShader =
 				  "precision mediump float;\n"
+				+ "uniform sampler2D u_TexImage;\n"
 				+ "varying vec4 v_Color;\n"
+				+ "varying vec2 v_TexCoordinate;\n"
 				+ "void main() {\n"
-				+ "   gl_FragColor = v_Color; \n"
+				+ "   gl_FragColor = texture2D(u_TexImage, v_TexCoordinate); \n"
 				+ "}\n";
 
 			return perPixelFragmentShader;

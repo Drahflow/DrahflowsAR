@@ -1,6 +1,7 @@
 package name.drahflow.ar;
 
 public class GlobalState {
+	DrahflowsAR main;
 	CameraTracker cameraTracker;
 	VideoHistory videoHistory;
 

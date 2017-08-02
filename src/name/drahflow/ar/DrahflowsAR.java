@@ -40,6 +40,7 @@ public class DrahflowsAR extends Activity {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		global.main = this;
 
 		// disable non-3D elements
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -54,6 +55,22 @@ public class DrahflowsAR extends Activity {
 		if(!supportsEs2) {
 			throw new RuntimeException("ES2 not supported, this is hopeless");
 		}
+
+		final int width = camera_width;
+		final int height = camera_height;
+		global.videoHistory = new VideoHistory(width, height, camera_width, camera_height, 30l * 1000l * 1000l * 1000l);
+		global.cameraTracker = new CameraTracker((CameraManager)getSystemService(CAMERA_SERVICE), width, height, global.videoHistory);
+		global.sensorTracker = new SensorTracker((SensorManager)getSystemService(SENSOR_SERVICE), global.videoHistory, global.cameraTracker);
+		global.gestureTracker = new GestureTracker();
+
+		switchTo(new MainMenuActivity(global));
+	}
+
+	public void switchTo(ArActivity new_activity) {
+		if(activity != null) activity.onPause();
+
+		activity = new_activity;
+		activity.onResume();
 
 		mainView = new GLSurfaceView(this) {
 			public boolean onTouchEvent(MotionEvent e) {
@@ -92,22 +109,6 @@ public class DrahflowsAR extends Activity {
 			}
 		});
 		setContentView(mainView);
-
-		final int width = camera_width;
-		final int height = camera_height;
-		global.videoHistory = new VideoHistory(width, height, camera_width, camera_height, 30l * 1000l * 1000l * 1000l);
-		global.cameraTracker = new CameraTracker((CameraManager)getSystemService(CAMERA_SERVICE), width, height, global.videoHistory);
-		global.sensorTracker = new SensorTracker((SensorManager)getSystemService(SENSOR_SERVICE), global.videoHistory, global.cameraTracker);
-		global.gestureTracker = new GestureTracker();
-
-		switchTo(new MainMenuActivity(global));
-	}
-
-	public void switchTo(ArActivity new_activity) {
-		if(activity != null) activity.onPause();
-
-		activity = new_activity;
-		activity.onResume();
 
 		mainView.setRenderer(activity.getRenderer());
 	}

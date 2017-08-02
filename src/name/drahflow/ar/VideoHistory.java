@@ -16,8 +16,8 @@ public class VideoHistory {
 	private ArrayList<VideoFrame> frames = new ArrayList<>();
 	private long duration;
 
-	private int width;
-	private int height;
+	public final int width;
+	public final int height;
 	private int camera_width;
 	private int camera_height;
 
