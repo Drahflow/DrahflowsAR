@@ -182,7 +182,6 @@ public class CameraTracker {
 	}
 
   public void processFrame() {
-		long start = System.nanoTime();
 		VideoFrame lastFrame = history.getLastFrame();
 
 		Log.e("AR", "Camera processing on thread: " + Thread.currentThread().getName());
@@ -192,8 +191,10 @@ public class CameraTracker {
 		JNI.SVO_getTransformation(lastFrame.getTimestamp(), transformation);
 		lastFrame.setTransformation(transformation);
 
+		long start = System.nanoTime();
+		JNI.Gesture_processFrame();
 		long end = System.nanoTime();
-		Log.e("AR", "optimization took: " + (float)(end - start) / 1000000 + " ms");
+		Log.e("AR", "gesture processing took: " + (float)(end - start) / 1000000 + " ms");
   }
 
 	public void processAccelerometerEvent(SensorEvent e) {

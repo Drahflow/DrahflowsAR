@@ -19,7 +19,16 @@ public class GestureCalibrationActivity implements ArActivity {
 	private int height;
 
 	public void onTouchEvent(MotionEvent e) {
+		if(e.getActionMasked() != MotionEvent.ACTION_DOWN) {
+			final VideoFrame frame = global.videoHistory.getLastFrame();
+			JNI.Gesture_setMarker(minX(), minY(), maxX(), maxY());
+		}
 	}
+
+	private int minX() { return (int)(global.videoHistory.width * 0.3f); }
+	private int maxX() { return (int)(global.videoHistory.width * 0.7f); }
+	private int minY() { return (int)(global.videoHistory.width * 0.3f); }
+	private int maxY() { return (int)(global.videoHistory.width * 0.7f); }
 
 	public void onPause() {};
 	public void onResume() {};
@@ -185,10 +194,10 @@ public class GestureCalibrationActivity implements ArActivity {
 				outputData[i * 4 + 2] = intensities[i];
 			}
 
-			int minX = (int)(width * 0.47f);
-			int maxX = (int)(width * 0.53f);
-			int minY = (int)(height * 0.4f);
-			int maxY = (int)(height * 0.6f);
+			int minX = GestureCalibrationActivity.this.minX();
+			int maxX = GestureCalibrationActivity.this.maxX();
+			int minY = GestureCalibrationActivity.this.minY();
+			int maxY = GestureCalibrationActivity.this.maxY();
 			for(int line_width = 0; line_width < 4; ++line_width) {
 				for(int ty = minY; ty < maxY; ++ty) {
 					int leftI = (minX - line_width + ty * width) * 4;

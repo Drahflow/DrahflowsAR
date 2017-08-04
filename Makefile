@@ -1,7 +1,7 @@
 all: svo/toolchain svo/lib/libsvo.so libs/x86/libar_jni.so
 	ant debug
 
-libs/x86/libar_jni.so: jni/ar_jni.cpp jni/ar_jni.h
+libs/x86/libar_jni.so: jni/ar_jni.h jni/ar_svo.cpp jni/ar_gesture.cpp
 	~/android-sdk-linux/ndk-bundle/ndk-build -B
 
 svo/toolchain:

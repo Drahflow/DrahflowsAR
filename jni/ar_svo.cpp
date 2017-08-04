@@ -53,10 +53,11 @@ static constexpr int D = 16;
 typedef Matrix<double, D, 1> V;
 typedef Matrix<double, D, D> M;
 
+int cameraWidth;
+int cameraHeight;
+svo::FrameHandlerMono *frameHandler;
+
 static vk::AbstractCamera *camera;
-static int cameraWidth;
-static int cameraHeight;
-static svo::FrameHandlerMono *frameHandler;
 static unsigned char *intensitiesBuffer;
 
 struct SensorFusion: public UnscentedKalmanFilter<D> {
