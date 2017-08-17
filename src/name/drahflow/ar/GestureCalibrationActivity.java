@@ -25,10 +25,10 @@ public class GestureCalibrationActivity implements ArActivity {
 		}
 	}
 
-	private int minX() { return (int)(global.videoHistory.width * 0.3f); }
-	private int maxX() { return (int)(global.videoHistory.width * 0.7f); }
-	private int minY() { return (int)(global.videoHistory.width * 0.3f); }
-	private int maxY() { return (int)(global.videoHistory.width * 0.7f); }
+	private int minX() { return (int)(global.videoHistory.width * 0.4f); }
+	private int maxX() { return (int)(global.videoHistory.width * 0.6f); }
+	private int minY() { return (int)(global.videoHistory.width * 0.4f); }
+	private int maxY() { return (int)(global.videoHistory.width * 0.6f); }
 
 	public void onPause() {};
 	public void onResume() {};
@@ -167,7 +167,6 @@ public class GestureCalibrationActivity implements ArActivity {
 			drawScene(cameraTexture);
 		}
 
-		private final float[] RED = new float[] { 1.0f, 0.0f, 0.0f, 0f };
 		private void drawScene(int cameraTexture) {
 			drawQuad(RED, cameraTexture);
 		}
@@ -186,7 +185,8 @@ public class GestureCalibrationActivity implements ArActivity {
 			  outputData = new float[width * height * 4];
 			}
 
-			float[] intensities = global.videoHistory.getLastFrame().getIntensities();
+			// float[] intensities = global.videoHistory.getLastFrame().getIntensities();
+			float[] intensities = global.cameraTracker.debugImage;
 
 			for(int i = 0; i < width * height; ++i) {
 				outputData[i * 4 + 0] = intensities[i];
@@ -208,7 +208,7 @@ public class GestureCalibrationActivity implements ArActivity {
 				}
 
 				int targetX = width / 2;
-				int targetY = (int)(height * 0.35f);
+				int targetY = (int)(height * 0.4f);
 				outputData[(targetX + line_width + targetY * width) * 4 + 1] = 1;
 			}
 

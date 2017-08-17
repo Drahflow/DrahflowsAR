@@ -12,6 +12,6 @@ class JNI {
 	public native static void SVO_getTransformation(long time_nano, float[] transformation);
 
 	public native static void Gesture_setMarker(int xs, int ys, int xe, int ye);
-	public native static void Gesture_processFrame();
+	public native static void Gesture_processFrame(float[] debugImage);
 	public native static void Gesture_getTransformationRelative(long time_nano, float[] transformation);
 }

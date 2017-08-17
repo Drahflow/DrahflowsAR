@@ -26,7 +26,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_Gesture_1setMarker
   (JNIEnv *, jclass, jint, jint, jint, jint);
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_Gesture_1processFrame
-  (JNIEnv *, jclass);
+  (JNIEnv *, jclass, jfloatArray);
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_Gesture_1getTransformationRelative
   (JNIEnv *, jclass, jlong, jfloatArray);

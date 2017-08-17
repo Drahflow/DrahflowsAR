@@ -40,12 +40,15 @@ public class CameraTracker {
 	};
 
 	private CameraState cameraState;
+	public float[] debugImage;
 
   public CameraTracker(CameraManager _cameraManager, int _width, int _height, final VideoHistory _history) {
 		cameraManager = _cameraManager;
     width = _width;
     height = _height;
 		history = _history;
+
+		debugImage = new float[width * height];
 
 		cameraState = CameraState.CAMERA_NOT_AVAILABLE;
 
@@ -192,7 +195,7 @@ public class CameraTracker {
 		lastFrame.setTransformation(transformation);
 
 		long start = System.nanoTime();
-		JNI.Gesture_processFrame();
+		JNI.Gesture_processFrame(debugImage);
 		long end = System.nanoTime();
 		Log.e("AR", "gesture processing took: " + (float)(end - start) / 1000000 + " ms");
   }

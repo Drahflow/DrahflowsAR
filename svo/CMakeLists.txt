@@ -121,6 +121,7 @@ LIST(APPEND SOURCEFILES
   src/opencv/core/pca.cpp
   src/opencv/core/out.cpp
   src/opencv/core/rand.cpp
+  src/opencv/core/dxt.cpp
   src/opencv/imgproc/undistort.cpp
   src/opencv/imgproc/imgwarp.cpp
   src/opencv/imgproc/pyramids.cpp
@@ -128,7 +129,13 @@ LIST(APPEND SOURCEFILES
   src/opencv/imgproc/utils.cpp
   src/opencv/imgproc/color.cpp
   src/opencv/imgproc/demosaicing.cpp
+  src/opencv/imgproc/sumpixels.cpp
+  src/opencv/imgproc/histogram.cpp
   src/opencv/imgproc/tables.cpp
+  src/opencv/imgproc/thresh.cpp
+  src/opencv/imgproc/smooth.cpp
+  src/opencv/imgproc/filter.cpp
+  src/opencv/imgproc/templmatch.cpp
   src/opencv/calib3d/fundam.cpp
   src/opencv/calib3d/rho.cpp
   src/opencv/calib3d/ptsetreg.cpp
@@ -140,7 +147,13 @@ LIST(APPEND SOURCEFILES
   # src/opencv/imgcodecs/grfmt_jpeg.cpp
   # src/opencv/imgcodecs/grfmt_jpeg2000.cpp
   # src/opencv/imgcodecs/grfmt_png.cpp
-  src/opencv/imgcodecs/utils.cpp
+  src/opencv/features2d/feature2d.cpp
+  src/opencv/features2d/brisk.cpp
+  src/opencv/features2d/agast_score.cpp
+  src/opencv/features2d/agast.cpp
+  src/opencv/features2d/keypoint.cpp
+  src/opencv/features2d/matchers.cpp
+  src/opencv/xfeatures2d/freak.cpp
   src/boost/system/error_code.cpp
   src/boost/thread/pthread/thread.cpp
   src/boost/thread/pthread/once_atomic.cpp
