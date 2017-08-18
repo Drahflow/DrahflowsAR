@@ -20,8 +20,9 @@ public class GestureCalibrationActivity implements ArActivity {
 
 	public void onTouchEvent(MotionEvent e) {
 		if(e.getActionMasked() != MotionEvent.ACTION_DOWN) {
-			final VideoFrame frame = global.videoHistory.getLastFrame();
 			JNI.Gesture_setMarker(minX(), minY(), maxX(), maxY());
+
+			global.main.switchTo(new MainMenuActivity(global));
 		}
 	}
 

@@ -22,6 +22,9 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1processGyroscope
 JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1getTransformation
   (JNIEnv *, jclass, jlong, jfloatArray);
 
+JNIEXPORT jboolean JNICALL Java_name_drahflow_ar_JNI_SVO_1hasGoodTracking
+  (JNIEnv *, jclass);
+
 JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_Gesture_1setMarker
   (JNIEnv *, jclass, jint, jint, jint, jint);
 

@@ -55,9 +55,9 @@ typedef Matrix<double, D, D> M;
 
 int cameraWidth;
 int cameraHeight;
-svo::FrameHandlerMono *frameHandler;
+svo::FrameHandlerMono *frameHandler = nullptr;
 
-static vk::AbstractCamera *camera;
+static vk::AbstractCamera *camera = nullptr;
 static unsigned char *intensitiesBuffer;
 
 struct SensorFusion: public UnscentedKalmanFilter<D> {
@@ -168,6 +168,9 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1prepare
 
   cameraWidth = width;
   cameraHeight = height;
+
+  if(frameHandler) delete frameHandler;
+  if(camera) delete camera;
 
   camera = new vk::PinholeCamera(width, height,
       540.5454, 539.3325, 318.0489, 237.989,
@@ -600,4 +603,11 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1getTransformation
       tmp.state().x(X_z));
 
   saveTransformation(env, tmp, transformation);
+}
+
+JNIEXPORT jboolean JNICALL Java_name_drahflow_ar_JNI_SVO_1hasGoodTracking
+  (JNIEnv *env, jclass) {
+
+  if(!trackingEstablished) return false;
+  return frameHandler->trackingQuality() == svo::FrameHandlerMono::TrackingQuality::TRACKING_GOOD;
 }

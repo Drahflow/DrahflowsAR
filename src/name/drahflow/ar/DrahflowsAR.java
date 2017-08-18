@@ -28,9 +28,12 @@ import java.io.FileOutputStream;
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLDisplay;
 import android.view.MotionEvent;
+import javax.microedition.khronos.opengles.GL10;
 
 public class DrahflowsAR extends Activity {
 	private GLSurfaceView mainView;
+	private ActivityRenderer mainRenderer;
+	private GLSurfaceView.Renderer currentRenderer;
 	private ArActivity activity;
 	private GlobalState global = new GlobalState();
 
@@ -62,15 +65,6 @@ public class DrahflowsAR extends Activity {
 		global.cameraTracker = new CameraTracker((CameraManager)getSystemService(CAMERA_SERVICE), width, height, global.videoHistory);
 		global.sensorTracker = new SensorTracker((SensorManager)getSystemService(SENSOR_SERVICE), global.videoHistory, global.cameraTracker);
 		global.gestureTracker = new GestureTracker();
-
-		switchTo(new MainMenuActivity(global));
-	}
-
-	public void switchTo(ArActivity new_activity) {
-		if(activity != null) activity.onPause();
-
-		activity = new_activity;
-		activity.onResume();
 
 		mainView = new GLSurfaceView(this) {
 			public boolean onTouchEvent(MotionEvent e) {
@@ -108,9 +102,43 @@ public class DrahflowsAR extends Activity {
 				return configs[0];
 			}
 		});
+
+		mainRenderer = new ActivityRenderer();
+		mainView.setRenderer(mainRenderer);
+
 		setContentView(mainView);
 
-		mainView.setRenderer(activity.getRenderer());
+		switchTo(new MainMenuActivity(global));
+	}
+
+	public void switchTo(ArActivity new_activity) {
+		if(activity != null) activity.onPause();
+
+		activity = new_activity;
+		activity.onResume();
+		currentRenderer = null;
+
+	}
+
+	class ActivityRenderer implements GLSurfaceView.Renderer {
+		public int width;
+		public int height;
+
+		public void onSurfaceCreated(GL10 glUnused, EGLConfig config) { }
+		public void onSurfaceChanged(GL10 glUnused, int _width, int _height) {
+			width = _width;
+			height = _height;
+		}
+
+		public void onDrawFrame(GL10 glUnused) {
+			if(currentRenderer == null) {
+				currentRenderer = activity.getRenderer();
+				currentRenderer.onSurfaceCreated(null, null);
+				currentRenderer.onSurfaceChanged(null, mainRenderer.width, mainRenderer.height);
+			}
+
+			currentRenderer.onDrawFrame(null);
+		}
 	}
 
 	@Override

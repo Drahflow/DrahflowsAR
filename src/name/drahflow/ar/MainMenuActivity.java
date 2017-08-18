@@ -96,13 +96,23 @@ public class MainMenuActivity implements ArActivity {
 
 	private MenuElement[] menuElements = new MenuElement[] {
 		new MenuElement() {
-			{ x = 0f; y = 0.05f; s = 0.01f; }
+			{ x = -0.05f; y = 0.05f; s = 0.01f; }
 
 			public void draw(Renderer r) {
-				draw(r, global.cameraTracker.isTrackingEstablished()? GREEN: RED);
+				draw(r, global.cameraTracker.hasGoodTracking()? GREEN: RED);
 			}
 			public void onClick() {
-				// TODO: (re-)initialize camera tracking
+				global.cameraTracker.initialize();
+			}
+		},
+		new MenuElement() {
+			{ x = 0.05f; y = 0.05f; s = 0.01f; }
+
+			public void draw(Renderer r) {
+				draw(r, RED);
+			}
+			public void onClick() {
+				// TODO: calibrate world coordinate scale
 			}
 		},
 		new MenuElement() {
@@ -120,7 +130,7 @@ public class MainMenuActivity implements ArActivity {
 
 			public void draw(Renderer r) {
 				draw(r,
-						global.cameraTracker.isTrackingEstablished() &&
+						global.cameraTracker.hasGoodTracking() &&
 						global.gestureTracker.isTrackingEstablished()? GREEN: RED);
 			}
 			public void onClick() {

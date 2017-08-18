@@ -83,6 +83,10 @@ public class CameraTracker {
 			}
 		}, cameraHandler);
 
+		initialize();
+	}
+
+	public void initialize() {
 		// TODO: drop (or forward) unused calibration parameters
 		JNI.SVO_prepare(width, height, 0.0f, 0.0f, 0.0, 0.0);
 	}
@@ -179,9 +183,8 @@ public class CameraTracker {
 	public void onPause() { stopCamera(); }
 	public void onResume() { startCamera(); }
 
-	public boolean isTrackingEstablished() {
-		// FIXME: Actually report _tracking_ not just camera online
-		return cameraState == CameraState.CAMERA_OPERATIONAL;
+	public boolean hasGoodTracking() {
+		return JNI.SVO_hasGoodTracking();
 	}
 
   public void processFrame() {

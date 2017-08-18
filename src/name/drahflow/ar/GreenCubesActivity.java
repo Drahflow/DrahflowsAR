@@ -15,7 +15,12 @@ import android.util.Log;
 import android.view.MotionEvent;
 
 public class GreenCubesActivity implements ArActivity {
-	public void onTouchEvent(MotionEvent e) {}
+	private GlobalState global;
+
+	public void onTouchEvent(MotionEvent e) {
+		global.main.switchTo(new MainMenuActivity(global));
+	}
+
 	public void onPause() {};
 	public void onResume() {};
 
@@ -28,6 +33,8 @@ public class GreenCubesActivity implements ArActivity {
 	private CameraTracker cameraTracker;
 
 	public GreenCubesActivity(GlobalState global) {
+		this.global = global;
+
 		cameraTracker = global.cameraTracker;
 		videoHistory = global.videoHistory;
 		renderer = new DevelopmentRenderer(videoHistory.width, videoHistory.height);
