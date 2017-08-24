@@ -51,13 +51,15 @@ public class GreenCubesActivity implements ArActivity {
 
 		private int sourceDataHandle;
 
+		private float[] shiftMatrix = new float[16];
 		private float[] lookAtMatrix = new float[16];
 		private float[] viewMatrix = new float[16];
 		private float[] modelMatrix = new float[16];
 		private float[] projectionMatrix = new float[16];
+		private float[] mvpsMatrix = new float[16];
 		private float[] mvpMatrix = new float[16];
 		private float[] mvMatrix = new float[16];
-		private int mvpMatrixHandle;
+		private int mvpsMatrixHandle;
 
 		private int linkedShaderHandle;
 		private int linkedShaderHandleSimple;
@@ -274,7 +276,7 @@ public class GreenCubesActivity implements ArActivity {
 			final float upZ = 0.0f;
 
 			// Set program handles for cube drawing.
-			mvpMatrixHandle = GLES20.glGetUniformLocation(linkedShaderHandle, "u_MVPMatrix");
+			mvpsMatrixHandle = GLES20.glGetUniformLocation(linkedShaderHandle, "u_MVPSMatrix");
 			positionHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_Position");
 			texCoordsHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_TexCoordinate");
 			sourceDataHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "u_SourceTexture");
@@ -301,12 +303,27 @@ public class GreenCubesActivity implements ArActivity {
 			cameraTracker.getTransformationAt(System.nanoTime() + DISPLAY_LAG_NS, pose);
 
 			GLES20.glViewport(0, 0, width / 2, height);
-			Matrix.setLookAtM(lookAtMatrix, 0, eyeX - 0.10f, eyeY, eyeZ, lookX - 0.10f, lookY, lookZ, upX, upY, upZ);
+			Utils.noGlError();
+
+			Matrix.setIdentityM(shiftMatrix, 0);
+			Matrix.translateM(shiftMatrix, 0, -global.eyeShift / 2, 0, 0);
+			Matrix.setLookAtM(lookAtMatrix, 0,
+					-global.eyeDistance / 2, 0f, 0f,
+					-global.eyeDistance / 2, 0f, -5f,
+					0f, 1f, 0f);
+			Utils.noGlError();
 			drawEyeView(pose);
 			Utils.noGlError();
 
 			GLES20.glViewport(width / 2, 0, width / 2, height);
-			Matrix.setLookAtM(lookAtMatrix, 0, eyeX - 0.03f, eyeY, eyeZ, lookX - 0.03f, lookY, lookZ, upX, upY, upZ);
+			Utils.noGlError();
+			Matrix.setIdentityM(shiftMatrix, 0);
+			Matrix.translateM(shiftMatrix, 0, global.eyeShift / 2, 0, 0);
+			Matrix.setLookAtM(lookAtMatrix, 0,
+					global.eyeDistance / 2, 0f, 0f,
+					global.eyeDistance / 2, 0f, -5f,
+					0f, 1f, 0f);
+			Utils.noGlError();
 			drawEyeView(pose);
 			Utils.noGlError();
 
@@ -327,7 +344,10 @@ public class GreenCubesActivity implements ArActivity {
 			};
 
 			Matrix.multiplyMM(viewMatrix, 0, lookAtMatrix, 0, rotationMatrix, 0);
-			Matrix.translateM(viewMatrix, 0, -pose[0], pose[1], pose[2]);
+			Matrix.translateM(viewMatrix, 0,
+					global.vrScale * -pose[0],
+					global.vrScale * pose[1],
+					global.vrScale * pose[2]);
 
 			long start = System.nanoTime();
 			drawScene();
@@ -381,7 +401,9 @@ public class GreenCubesActivity implements ArActivity {
 
 			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
 			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
-			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+			Matrix.multiplyMM(mvpsMatrix, 0, shiftMatrix, 0, mvpMatrix, 0);
+			Utils.noGlError();
+			GLES20.glUniformMatrix4fv(mvpsMatrixHandle, 1, false, mvpsMatrix, 0);
 
 			// Actually draw
 			// GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
@@ -411,7 +433,7 @@ public class GreenCubesActivity implements ArActivity {
 			GLES20.glUniform1i(sourceDataHandle, 0);
 
 			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
-			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+			GLES20.glUniformMatrix4fv(mvpsMatrixHandle, 1, false, mvpsMatrix, 0);
 
 			// Actually draw
 			GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6);
@@ -474,7 +496,7 @@ public class GreenCubesActivity implements ArActivity {
 		protected String getVertexShader() {
 			// Define our per-pixel lighting shader.
 			final String perPixelVertexShader =
-				  "uniform mat4 u_MVPMatrix;      \n"		// A constant representing the combined model/view/projection matrix.
+				  "uniform mat4 u_MVPSMatrix;      \n"		// A constant representing the combined model/view/projection matrix.
 				+ "attribute vec4 a_Position;     \n"		// Per-vertex position information we will pass in.
 				+ "attribute vec2 a_TexCoordinate; \n"	// Per-vertex texcoords information we will pass in.
 				+ "varying vec2 v_TexCoordinate;  \n"		// This will be passed into the fragment shader.
@@ -485,7 +507,7 @@ public class GreenCubesActivity implements ArActivity {
 				+ "   v_TexCoordinate = a_TexCoordinate;                      \n" // pass through texture coords
 				// gl_Position is a special variable used to store the final position.
 				// Multiply the vertex by the matrix to get the final point in normalized screen coordinates.
-				+ "   gl_Position = u_MVPMatrix * a_Position;                 \n"
+				+ "   gl_Position = u_MVPSMatrix * a_Position;                 \n"
 				+ "}                                                          \n";
 
 			return perPixelVertexShader;

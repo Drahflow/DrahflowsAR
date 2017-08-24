@@ -55,7 +55,7 @@ int cameraWidth;
 int cameraHeight;
 svo::FrameHandlerMono *frameHandler = nullptr;
 
-float mapScale = 2.0;
+float accelerometerScale = 2.0;
 
 static vk::AbstractCamera *camera = nullptr;
 static unsigned char *intensitiesBuffer;
@@ -320,9 +320,9 @@ static void saveTransformation(JNIEnv *env, SensorFusion &filter, jfloatArray tr
 
   jfloat *transformationData = env->GetFloatArrayElements(transformation, 0);
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMED");
-  transformationData[0] = filter.state().x(X_x) / mapScale; //filter.state().x(MapScale);
-  transformationData[1] = filter.state().x(X_y) / mapScale; //filter.state().x(MapScale);
-  transformationData[2] = filter.state().x(X_z) / mapScale; //filter.state().x(MapScale);
+  transformationData[0] = filter.state().x(X_x);
+  transformationData[1] = filter.state().x(X_y);
+  transformationData[2] = filter.state().x(X_z);
   __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEE");
   transformationData[3] = filter.rot_x;
   transformationData[4] = filter.rot_y;
@@ -454,9 +454,9 @@ class RecordedAccelerometerEvent: public RecordedEvent {
           [&sF](const V &x) -> Matrix<double, 3, 1> {
             Matrix<double, 3, 1> ret;
 
-            double rel_ax = x(A_x) / mapScale + x(g_x);
-            double rel_ay = -x(A_y) / mapScale + x(g_y);
-            double rel_az = -x(A_z) / mapScale + x(g_z);
+            double rel_ax = x(A_x) / accelerometerScale + x(g_x);
+            double rel_ay = -x(A_y) / accelerometerScale + x(g_y);
+            double rel_az = -x(A_z) / accelerometerScale + x(g_z);
 
             // signs randomly inverted until gravity vector became semi-stable
             Quaternion<double> q(sF.rot_w, -sF.rot_x, sF.rot_y, sF.rot_z);
@@ -612,7 +612,7 @@ JNIEXPORT jboolean JNICALL Java_name_drahflow_ar_JNI_SVO_1hasGoodTracking
   return frameHandler->trackingQuality() == svo::FrameHandlerMono::TrackingQuality::TRACKING_GOOD;
 }
 
-JNIEXPORT void JNIEXPORT Java_name_drahflow_ar_JNI_SVO_1setMapScale
+JNIEXPORT void JNIEXPORT Java_name_drahflow_ar_JNI_SVO_1setAccelerometerScale
   (JNIEnv *env, jclass, jfloat scale) {
-  mapScale = scale;
+  accelerometerScale = scale;
 }

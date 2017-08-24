@@ -7,10 +7,11 @@ public class GlobalState {
 	SensorTracker sensorTracker;
 	GestureTracker gestureTracker;
 
+	float eyeShift = 0.08f;
+	float eyeDistance = 0.0246f;
+	float vrScale = 0.2f;
 	float cameraDistance = 0.03f;
-	float eyeDistance = 0.07f;
-	float eyeLookDistance = 0.07f;
-	float mapScale = 2f;
+	float accelerometerScale = 4f;
 
 	public void onPause() {
 		if(cameraTracker != null) cameraTracker.onPause();

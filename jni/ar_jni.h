@@ -25,7 +25,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1getTransformation
 JNIEXPORT jboolean JNICALL Java_name_drahflow_ar_JNI_SVO_1hasGoodTracking
   (JNIEnv *, jclass);
 
-JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1setMapScale
+JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1setAccelerometerScale
   (JNIEnv *, jclass, jfloat);
 
 

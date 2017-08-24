@@ -27,13 +27,13 @@ public class Menu {
 		float x = e.getAxisValue(MotionEvent.AXIS_X);
 		float y = e.getAxisValue(MotionEvent.AXIS_Y);
 		if(x > width / 2) {
-			x -= width / 1.82f;
+			x -= 275f;
 		} else {
-			x -= width / 6.2f;
+			x -= 30f;
 		}
 
 		x -= width / 4;
-		y -= height / 2;
+		y -= height / 1.90;
 
 		mouseX = x / width / 1.6f;
 		mouseY = -y / height / 5.4f;
@@ -184,12 +184,12 @@ public class Menu {
 			Utils.noGlError();
 
 			GLES20.glViewport(0, 0, width / 2, height);
-			Matrix.setLookAtM(viewMatrix, 0, eyeX - 0.10f, eyeY, eyeZ, lookX - 0.10f, lookY, lookZ, upX, upY, upZ);
+			Matrix.setLookAtM(viewMatrix, 0, eyeX - 0.035f, eyeY, eyeZ, lookX - 0.035f, lookY, lookZ, upX, upY, upZ);
 			drawEyeView();
 			Utils.noGlError();
 
 			GLES20.glViewport(width / 2, 0, width / 2, height);
-			Matrix.setLookAtM(viewMatrix, 0, eyeX - 0.03f, eyeY, eyeZ, lookX - 0.03f, lookY, lookZ, upX, upY, upZ);
+			Matrix.setLookAtM(viewMatrix, 0, eyeX + 0.035f, eyeY, eyeZ, lookX + 0.035f, lookY, lookZ, upX, upY, upZ);
 			drawEyeView();
 			Utils.noGlError();
 		}
