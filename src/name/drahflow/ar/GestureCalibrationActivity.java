@@ -13,119 +13,32 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import android.util.Log;
 import android.view.MotionEvent;
+import name.drahflow.ar.geometry.Constants;
+import name.drahflow.ar.geometry.Cube;
 
-public class GestureCalibrationActivity implements ArActivity {
+public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Renderer  {
 	private int width;
 	private int height;
 
+	interface Stage {
+		public void render();
+		public void click();
+	}
+	private Stage currentStage;
+
 	public void onTouchEvent(MotionEvent e) {
-		if(e.getActionMasked() != MotionEvent.ACTION_DOWN) {
+		if(e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+			currentStage.click();
+		}
+	}
+
+	private Stage acquireStage = new Stage() {
+		public void click() {
 			JNI.Gesture_setMarker(minX(), minY(), maxX(), maxY());
-
-			global.main.switchTo(new MainMenuActivity(global));
-		}
-	}
-
-	private int minX() { return (int)(global.videoHistory.width * 0.4f); }
-	private int maxX() { return (int)(global.videoHistory.width * 0.6f); }
-	private int minY() { return (int)(global.videoHistory.width * 0.4f); }
-	private int maxY() { return (int)(global.videoHistory.width * 0.6f); }
-
-	public void onPause() {};
-	public void onResume() {};
-
-	private GLSurfaceView.Renderer renderer;
-	public GLSurfaceView.Renderer getRenderer() {
-		return renderer;
-	}
-
-	private GlobalState global;
-
-	public GestureCalibrationActivity(GlobalState _global) {
-		global = _global;
-
-		renderer = new Renderer();
-	}
-
-	private final float[] RED = new float[] { 1f, 0f, 0f, 0f };
-	private final float[] GREEN = new float[] { 0f, 1f, 0f, 0f };
-
-	private static FloatBuffer outputTextureBuffer;
-	private static float[] outputData;
-
-	private class Renderer implements GLSurfaceView.Renderer {
-		private FloatBuffer quadPositions;
-		private FloatBuffer quadTexCoords;
-		private int positionHandle;
-		private int texCoordsHandle;
-
-		private float[] viewMatrix = new float[16];
-		private float[] modelMatrix = new float[16];
-		private float[] projectionMatrix = new float[16];
-		private float[] mvpMatrix = new float[16];
-		private float[] mvMatrix = new float[16];
-		private int mvpMatrixHandle;
-		private int colorHandle;
-		private int texSamplerHandle;
-
-		private int linkedShaderHandle;
-
-		public Renderer() {
-			loadModelData();
+			currentStage = nearStage;
 		}
 
-		private void loadModelData() {
-			float[] positions = {
-				-1, -1, 0,   1, -1, 0,   1,  1, 0,
-        -1, 1, 0,   -1, -1, 0,   1,  1, 0,
-			};
-
-			quadPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
-					.order(ByteOrder.nativeOrder()).asFloatBuffer();
-			quadPositions.put(positions).position(0);
-
-			float[] texCoords = {
-				0, 1,    1, 1,     1, 0,
-				0, 0,    0, 1,     1, 0
-			};
-
-			quadTexCoords = ByteBuffer.allocateDirect(texCoords.length * Utils.BYTES_PER_FLOAT)
-					.order(ByteOrder.nativeOrder()).asFloatBuffer();
-			quadTexCoords.put(texCoords).position(0);
-		}
-
-		@Override
-		public void onSurfaceCreated(GL10 glUnused, EGLConfig config) {
-			GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-			GLES20.glEnable(GLES20.GL_CULL_FACE);
-			GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-
-			linkedShaderHandle = Utils.compileShader(getVertexShader(), getFragmentShader(),
-					new String[] {"a_Position"});
-		}
-
-		@Override
-		public void onSurfaceChanged(GL10 glUnused, int _width, int _height) {
-			// Set the OpenGL viewport to the same size as the surface.
-			width = _width;
-			height = _height;
-
-			// Create a new perspective projection matrix. The height will stay the same
-			// while the width will vary as per aspect ratio.
-			final float ratio = (float) width / height;
-			final float zoom = 111f;
-			final float left = -ratio / zoom;
-			final float right = ratio / zoom;
-			final float bottom = -1.0f / zoom;
-			final float top = 1.0f / zoom;
-			final float near = 0.1f;
-			final float far = 50.0f;
-
-			Matrix.frustumM(projectionMatrix, 0, left, right, bottom, top, near, far);
-		}
-
-		@Override
-		public void onDrawFrame(GL10 glUnused) {
+		public void render() {
 			final float eyeX = 0.0f;
 			final float eyeY = 0.0f;
 			final float eyeZ = 0.0f;
@@ -163,131 +76,258 @@ public class GestureCalibrationActivity implements ArActivity {
 
 			GLES20.glDeleteTextures(1, cameraTexture, 0);
 		}
+	};
 
-		private void drawEyeView(int cameraTexture) {
-			drawScene(cameraTexture);
+	private Stage nearStage = new Stage() {
+		Cube cube = new Cube(0f, 0f, -0.15f, 0.005f);
+
+		public void click() {
+			currentStage = farStage;
 		}
 
-		private void drawScene(int cameraTexture) {
-			drawQuad(RED, cameraTexture);
+		public void render() {
+			cube.setTexture(global.gestureTracker.isTrackingEstablished()? Constants.GREEN: Constants.RED);
+			global.view.render(cube);
+		}
+	};
+
+	private Stage farStage = new Stage() {
+		Cube cube = new Cube(0f, 0f, -0.2f, 0.005f);
+
+		public void click() {
+			global.main.switchTo(new MainMenuActivity(global));
 		}
 
-		private int[] bindCameraTexture() {
-			final int width = global.videoHistory.width;
-			final int height = global.videoHistory.height;
+		public void render() {
+			cube.setTexture(global.gestureTracker.isTrackingEstablished()? Constants.GREEN: Constants.RED);
+			global.view.render(cube);
+		}
+	};
 
-			int[] someTexs = new int[1];
-			GLES20.glGenTextures(1, someTexs, 0);
-			int tmpTex = someTexs[0];
+	private int minX() { return (int)(global.videoHistory.width * 0.4f); }
+	private int maxX() { return (int)(global.videoHistory.width * 0.6f); }
+	private int minY() { return (int)(global.videoHistory.width * 0.4f); }
+	private int maxY() { return (int)(global.videoHistory.width * 0.6f); }
 
-			if(outputTextureBuffer == null) {
-				outputTextureBuffer = ByteBuffer.allocateDirect(4 * width * height * Utils.BYTES_PER_FLOAT)
-						.order(ByteOrder.nativeOrder()).asFloatBuffer();
-			  outputData = new float[width * height * 4];
+	public void onPause() {};
+	public void onResume() {};
+
+	public GLSurfaceView.Renderer getRenderer() {
+		return this;
+	}
+
+	private GlobalState global;
+
+	public GestureCalibrationActivity(GlobalState _global) {
+		global = _global;
+
+		loadModelData();
+
+		currentStage = acquireStage;
+	}
+
+	private final float[] RED = new float[] { 1f, 0f, 0f, 0f };
+	private final float[] GREEN = new float[] { 0f, 1f, 0f, 0f };
+
+	private static FloatBuffer outputTextureBuffer;
+	private static float[] outputData;
+
+	private FloatBuffer quadPositions;
+	private FloatBuffer quadTexCoords;
+	private int positionHandle;
+	private int texCoordsHandle;
+
+	private float[] viewMatrix = new float[16];
+	private float[] modelMatrix = new float[16];
+	private float[] projectionMatrix = new float[16];
+	private float[] mvpMatrix = new float[16];
+	private float[] mvMatrix = new float[16];
+	private int mvpMatrixHandle;
+	private int colorHandle;
+	private int texSamplerHandle;
+
+	private int linkedShaderHandle;
+
+	private void loadModelData() {
+		float[] positions = {
+			-1, -1, 0,   1, -1, 0,   1,  1, 0,
+			-1, 1, 0,   -1, -1, 0,   1,  1, 0,
+		};
+
+		quadPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
+				.order(ByteOrder.nativeOrder()).asFloatBuffer();
+		quadPositions.put(positions).position(0);
+
+		float[] texCoords = {
+			0, 1,    1, 1,     1, 0,
+			0, 0,    0, 1,     1, 0
+		};
+
+		quadTexCoords = ByteBuffer.allocateDirect(texCoords.length * Utils.BYTES_PER_FLOAT)
+				.order(ByteOrder.nativeOrder()).asFloatBuffer();
+		quadTexCoords.put(texCoords).position(0);
+	}
+
+	@Override
+	public void onSurfaceCreated(GL10 glUnused, EGLConfig config) {
+		GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		GLES20.glEnable(GLES20.GL_CULL_FACE);
+		GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+
+		linkedShaderHandle = Utils.compileShader(getVertexShader(), getFragmentShader(),
+				new String[] {"a_Position"});
+	}
+
+	@Override
+	public void onSurfaceChanged(GL10 glUnused, int _width, int _height) {
+		// Set the OpenGL viewport to the same size as the surface.
+		width = _width;
+		height = _height;
+
+		// Create a new perspective projection matrix. The height will stay the same
+		// while the width will vary as per aspect ratio.
+		final float ratio = (float) width / height;
+		final float zoom = 111f;
+		final float left = -ratio / zoom;
+		final float right = ratio / zoom;
+		final float bottom = -1.0f / zoom;
+		final float top = 1.0f / zoom;
+		final float near = 0.1f;
+		final float far = 50.0f;
+
+		Matrix.frustumM(projectionMatrix, 0, left, right, bottom, top, near, far);
+
+		global.view.surfaceChanged(width, height);
+	}
+
+	@Override
+	public void onDrawFrame(GL10 glUnused) {
+		currentStage.render();
+	}
+
+	private void drawEyeView(int cameraTexture) {
+		drawScene(cameraTexture);
+	}
+
+	private void drawScene(int cameraTexture) {
+		drawQuad(RED, cameraTexture);
+	}
+
+	private int[] bindCameraTexture() {
+		final int width = global.videoHistory.width;
+		final int height = global.videoHistory.height;
+
+		int[] someTexs = new int[1];
+		GLES20.glGenTextures(1, someTexs, 0);
+		int tmpTex = someTexs[0];
+
+		if(outputTextureBuffer == null) {
+			outputTextureBuffer = ByteBuffer.allocateDirect(4 * width * height * Utils.BYTES_PER_FLOAT)
+					.order(ByteOrder.nativeOrder()).asFloatBuffer();
+			outputData = new float[width * height * 4];
+		}
+
+		// float[] intensities = global.videoHistory.getLastFrame().getIntensities();
+		float[] intensities = global.cameraTracker.debugImage;
+
+		for(int i = 0; i < width * height; ++i) {
+			outputData[i * 4 + 0] = intensities[i];
+			outputData[i * 4 + 1] = intensities[i];
+			outputData[i * 4 + 2] = intensities[i];
+		}
+
+		int minX = GestureCalibrationActivity.this.minX();
+		int maxX = GestureCalibrationActivity.this.maxX();
+		int minY = GestureCalibrationActivity.this.minY();
+		int maxY = GestureCalibrationActivity.this.maxY();
+		for(int line_width = 0; line_width < 4; ++line_width) {
+			for(int ty = minY; ty < maxY; ++ty) {
+				int leftI = (minX - line_width + ty * width) * 4;
+				int rightI = (maxX + line_width + ty * width) * 4;
+
+				outputData[leftI] = 1;
+				outputData[rightI] = 1;
 			}
 
-			// float[] intensities = global.videoHistory.getLastFrame().getIntensities();
-			float[] intensities = global.cameraTracker.debugImage;
-
-			for(int i = 0; i < width * height; ++i) {
-				outputData[i * 4 + 0] = intensities[i];
-				outputData[i * 4 + 1] = intensities[i];
-				outputData[i * 4 + 2] = intensities[i];
-			}
-
-			int minX = GestureCalibrationActivity.this.minX();
-			int maxX = GestureCalibrationActivity.this.maxX();
-			int minY = GestureCalibrationActivity.this.minY();
-			int maxY = GestureCalibrationActivity.this.maxY();
-			for(int line_width = 0; line_width < 4; ++line_width) {
-				for(int ty = minY; ty < maxY; ++ty) {
-					int leftI = (minX - line_width + ty * width) * 4;
-					int rightI = (maxX + line_width + ty * width) * 4;
-
-					outputData[leftI] = 1;
-					outputData[rightI] = 1;
-				}
-
-				int targetX = width / 2;
-				int targetY = (int)(height * 0.4f);
-				outputData[(targetX + line_width + targetY * width) * 4 + 1] = 1;
-			}
-
-			outputTextureBuffer.position(0);
-			outputTextureBuffer.put(outputData);
-
-			outputTextureBuffer.position(0);
-			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tmpTex);
-			GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_FLOAT, outputTextureBuffer);
-			GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-			GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-
-			return someTexs;
+			int targetX = width / 2;
+			int targetY = (int)(height * 0.4f);
+			outputData[(targetX + line_width + targetY * width) * 4 + 1] = 1;
 		}
 
-		public void drawQuad(float[] color, int cameraTexture) {
-			Matrix.setIdentityM(modelMatrix, 0);
+		outputTextureBuffer.position(0);
+		outputTextureBuffer.put(outputData);
 
-			GLES20.glUseProgram(linkedShaderHandle);
+		outputTextureBuffer.position(0);
+		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tmpTex);
+		GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_FLOAT, outputTextureBuffer);
+		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
 
-			// Pass in the position information
-			quadPositions.position(0);
-			GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false,
-					0, quadPositions);
-			GLES20.glEnableVertexAttribArray(positionHandle);
+		return someTexs;
+	}
 
-			// Pass in texture information
-			quadTexCoords.position(0);
-			GLES20.glVertexAttribPointer(texCoordsHandle, 2, GLES20.GL_FLOAT, false,
-					0, quadTexCoords);
-			GLES20.glEnableVertexAttribArray(texCoordsHandle);
+	public void drawQuad(float[] color, int cameraTexture) {
+		Matrix.setIdentityM(modelMatrix, 0);
 
-			// Model transformations
-			Matrix.translateM(modelMatrix, 0, -0.06f, 0f, -1f);
-			Matrix.scaleM(modelMatrix, 0, 0.12f, 0.06f, 0.06f);
+		GLES20.glUseProgram(linkedShaderHandle);
 
-			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
-			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
-			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
-			GLES20.glUniform4fv(colorHandle, 1, color, 0);
+		// Pass in the position information
+		quadPositions.position(0);
+		GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false,
+				0, quadPositions);
+		GLES20.glEnableVertexAttribArray(positionHandle);
 
-			GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, cameraTexture);
-			GLES20.glUniform1i(texSamplerHandle, 0);
+		// Pass in texture information
+		quadTexCoords.position(0);
+		GLES20.glVertexAttribPointer(texCoordsHandle, 2, GLES20.GL_FLOAT, false,
+				0, quadTexCoords);
+		GLES20.glEnableVertexAttribArray(texCoordsHandle);
 
-			GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, quadPositions.limit() / 3);
-		}
+		// Model transformations
+		Matrix.translateM(modelMatrix, 0, -0.06f, 0f, -1f);
+		Matrix.scaleM(modelMatrix, 0, 0.12f, 0.06f, 0.06f);
 
-		protected String getVertexShader() {
-			final String perPixelVertexShader =
-				  "uniform mat4 u_MVPMatrix;      \n"
-				+ "uniform vec4 u_Color;          \n"
-				+ "attribute vec4 a_Position;     \n"
-				+ "attribute vec2 a_TexCoordinate;\n"
-				+ "varying vec4 v_Color;          \n"
-				+ "varying vec2 v_TexCoordinate;  \n"
+		Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+		Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
+		GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+		GLES20.glUniform4fv(colorHandle, 1, color, 0);
 
-				+ "void main()                                \n"
-				+ "{                                          \n"
-				+ "   v_Color = u_Color;                      \n"
-				+ "   v_TexCoordinate = a_TexCoordinate;      \n"
-				+ "   gl_Position = u_MVPMatrix * a_Position; \n"
-				+ "}                                          \n";
+		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, cameraTexture);
+		GLES20.glUniform1i(texSamplerHandle, 0);
 
-			return perPixelVertexShader;
-		}
+		GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, quadPositions.limit() / 3);
+	}
 
-		protected String getFragmentShader() {
-			final String perPixelFragmentShader =
-				  "precision mediump float;\n"
-				+ "uniform sampler2D u_TexImage;\n"
-				+ "varying vec4 v_Color;\n"
-				+ "varying vec2 v_TexCoordinate;\n"
-				+ "void main() {\n"
-				+ "   gl_FragColor = texture2D(u_TexImage, v_TexCoordinate); \n"
-				+ "}\n";
+	protected String getVertexShader() {
+		final String perPixelVertexShader =
+				"uniform mat4 u_MVPMatrix;      \n"
+			+ "uniform vec4 u_Color;          \n"
+			+ "attribute vec4 a_Position;     \n"
+			+ "attribute vec2 a_TexCoordinate;\n"
+			+ "varying vec4 v_Color;          \n"
+			+ "varying vec2 v_TexCoordinate;  \n"
 
-			return perPixelFragmentShader;
-		}
+			+ "void main()                                \n"
+			+ "{                                          \n"
+			+ "   v_Color = u_Color;                      \n"
+			+ "   v_TexCoordinate = a_TexCoordinate;      \n"
+			+ "   gl_Position = u_MVPMatrix * a_Position; \n"
+			+ "}                                          \n";
+
+		return perPixelVertexShader;
+	}
+
+	protected String getFragmentShader() {
+		final String perPixelFragmentShader =
+				"precision mediump float;\n"
+			+ "uniform sampler2D u_TexImage;\n"
+			+ "varying vec4 v_Color;\n"
+			+ "varying vec2 v_TexCoordinate;\n"
+			+ "void main() {\n"
+			+ "   gl_FragColor = texture2D(u_TexImage, v_TexCoordinate); \n"
+			+ "}\n";
+
+		return perPixelFragmentShader;
 	}
 }

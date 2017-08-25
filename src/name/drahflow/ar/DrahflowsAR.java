@@ -65,6 +65,7 @@ public class DrahflowsAR extends Activity {
 		global.cameraTracker = new CameraTracker((CameraManager)getSystemService(CAMERA_SERVICE), width, height, global.videoHistory);
 		global.sensorTracker = new SensorTracker((SensorManager)getSystemService(SENSOR_SERVICE), global.videoHistory, global.cameraTracker);
 		global.gestureTracker = new GestureTracker();
+		global.view = new name.drahflow.ar.geometry.View(global);
 
 		mainView = new GLSurfaceView(this) {
 			public boolean onTouchEvent(MotionEvent e) {

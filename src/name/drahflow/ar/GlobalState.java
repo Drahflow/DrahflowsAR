@@ -1,17 +1,19 @@
 package name.drahflow.ar;
 
 public class GlobalState {
-	DrahflowsAR main;
-	CameraTracker cameraTracker;
-	VideoHistory videoHistory;
-	SensorTracker sensorTracker;
-	GestureTracker gestureTracker;
+	public DrahflowsAR main;
+	public CameraTracker cameraTracker;
+	public VideoHistory videoHistory;
+	public SensorTracker sensorTracker;
+	public GestureTracker gestureTracker;
+	public name.drahflow.ar.geometry.View view;
 
-	float eyeShift = 0.08f;
-	float eyeDistance = 0.0246f;
-	float vrScale = 0.2f;
-	float cameraDistance = 0.03f;
-	float accelerometerScale = 4f;
+	public long displayLag = 90000000;
+	public float eyeShift = 0.08f;
+	public float eyeDistance = 0.0246f;
+	public float vrScale = 0.2f;
+	public float cameraDistance = 0.03f;
+	public float accelerometerScale = 4f;
 
 	public void onPause() {
 		if(cameraTracker != null) cameraTracker.onPause();
