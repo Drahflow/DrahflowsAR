@@ -110,8 +110,8 @@ public class ScaleCalibrationActivity implements ArActivity, GLSurfaceView.Rende
 			Matrix.setIdentityM(shiftMatrix, 0);
 			Matrix.translateM(shiftMatrix, 0, -global.eyeShift / 2, 0, 0);
 			Matrix.setLookAtM(lookAtMatrix, 0,
-					-global.eyeDistance / 2, 0f, 0f,
-					-global.eyeDistance / 2, 0f, -5f,
+					-global.eyeDistance / 2 - global.cameraDistance, 0f, 0f,
+					-global.eyeDistance / 2 - global.cameraDistance, 0f, -5f,
 					0f, 1f, 0f);
 			Utils.noGlError();
 			drawEyeView(pose);
@@ -122,8 +122,8 @@ public class ScaleCalibrationActivity implements ArActivity, GLSurfaceView.Rende
 			Matrix.setIdentityM(shiftMatrix, 0);
 			Matrix.translateM(shiftMatrix, 0, global.eyeShift / 2, 0, 0);
 			Matrix.setLookAtM(lookAtMatrix, 0,
-					global.eyeDistance / 2, 0f, 0f,
-					global.eyeDistance / 2, 0f, -5f,
+					global.eyeDistance / 2 - global.cameraDistance, 0f, 0f,
+					global.eyeDistance / 2 - global.cameraDistance, 0f, -5f,
 					0f, 1f, 0f);
 			Utils.noGlError();
 			drawEyeView(pose);
@@ -146,8 +146,8 @@ public class ScaleCalibrationActivity implements ArActivity, GLSurfaceView.Rende
 			Matrix.setIdentityM(shiftMatrix, 0);
 			Matrix.translateM(shiftMatrix, 0, -global.eyeShift / 2, 0, 0);
 			Matrix.setLookAtM(lookAtMatrix, 0,
-					-global.eyeDistance / 2, 0f, 0f,
-					-global.eyeDistance / 2, 0f, -5f,
+					-global.eyeDistance / 2 - global.cameraDistance, 0f, 0f,
+					-global.eyeDistance / 2 - global.cameraDistance, 0f, -5f,
 					0f, 1f, 0f);
 			Utils.noGlError();
 			drawEyeView(pose);
@@ -158,8 +158,8 @@ public class ScaleCalibrationActivity implements ArActivity, GLSurfaceView.Rende
 			Matrix.setIdentityM(shiftMatrix, 0);
 			Matrix.translateM(shiftMatrix, 0, global.eyeShift / 2, 0, 0);
 			Matrix.setLookAtM(lookAtMatrix, 0,
-					global.eyeDistance / 2, 0f, 0f,
-					global.eyeDistance / 2, 0f, -5f,
+					global.eyeDistance / 2 - global.cameraDistance, 0f, 0f,
+					global.eyeDistance / 2 - global.cameraDistance, 0f, -5f,
 					0f, 1f, 0f);
 			Utils.noGlError();
 			drawEyeView(pose);

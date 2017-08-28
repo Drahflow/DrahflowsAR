@@ -72,7 +72,7 @@ public class MainMenuActivity implements ArActivity {
 						global.gestureTracker.isTrackingEstablished()? Menu.GREEN: Menu.RED);
 			}
 			public void onClick() {
-				global.main.switchTo(new GreenCubesActivity(global));
+				global.main.switchTo(new MainActivity(global));
 			}
 		});
 	};

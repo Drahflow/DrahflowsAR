@@ -13,64 +13,93 @@ public class View {
 	private float[] shiftMatrix = new float[16];
 	private float[] projectionMatrix = new float[16];
 	private float[] lookAtMatrix = new float[16];
+	private float[] poseMatrix = new float[16];
 	private float[] viewMatrix = new float[16];
 	private float[] vpMatrix = new float[16];
 	private float[] vpsMatrix = new float[16];
+	private float[] pose = new float[7];
 
 	public View(GlobalState global) {
 		this.global = global;
 	}
 
 	public void render(Geometry g) {
+		clearScreen();
+		setCurrentPoseMatrix();
+		renderEyeViews(g);
+	}
+
+	public void renderUntracked(Geometry g) {
+		clearScreen();
+		Matrix.setIdentityM(poseMatrix, 0);
+		renderEyeViews(g);
+	}
+
+	private void clearScreen() {
 		GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		GLES20.glEnable(GLES20.GL_CULL_FACE);
 		GLES20.glEnable(GLES20.GL_DEPTH_TEST);
 		GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+		Utils.noGlError();
+	}
 
-		float[] pose = new float[7];
+	private void setCurrentPoseMatrix() {
+		getPose(poseMatrix);
+	}
+
+	public void getPose(float[] poseMatrix) {
 		global.cameraTracker.getTransformationAt(System.nanoTime() + global.displayLag, pose);
 
 		final float qi = pose[3];
 		final float qj = -pose[4];
 		final float qk = -pose[5];
 		final float qr = pose[6];
-		final float[] rotationMatrix = new float[] {
-			1f - 2f*(qj*qj + qk*qk), 2f*(qi*qj - qk*qr), 2f*(qi*qk + qj*qr), 0f,
-			2f*(qi*qj + qk*qr), 1f - 2f*(qi*qi + qk*qk), 2f*(qj*qk - qi*qr), 0f,
-			2f*(qi*qk - qj*qr), 2f*(qj*qk + qi*qr), 1f - 2f*(qi*qi + qj*qj), 0f,
-			0f,                 0f,                 0f,                      1f
-		};
+		poseMatrix[0] = 1f - 2f*(qj*qj + qk*qk);
+		poseMatrix[1] = 2f*(qi*qj - qk*qr);
+		poseMatrix[2] = 2f*(qi*qk + qj*qr);
+		poseMatrix[3] = 0f;
+		poseMatrix[4] = 2f*(qi*qj + qk*qr);
+    poseMatrix[5] = 1f - 2f*(qi*qi + qk*qk);
+    poseMatrix[6] = 2f*(qj*qk - qi*qr);
+    poseMatrix[7] = 0f;
+		poseMatrix[8] = 2f*(qi*qk - qj*qr);
+    poseMatrix[9] = 2f*(qj*qk + qi*qr);
+    poseMatrix[10] = 1f - 2f*(qi*qi + qj*qj);
+    poseMatrix[11] = 0f;
+		poseMatrix[12] = 0f;                
+		poseMatrix[13] = 0f;
+		poseMatrix[14] = 0f;
+		poseMatrix[15] = 1f;
 
-		Matrix.translateM(rotationMatrix, 0,
+		// TODO: This can be inlined. Just try it out once done.
+		Matrix.translateM(poseMatrix, 0,
 				global.vrScale * -pose[0],
 				global.vrScale * pose[1],
 				global.vrScale * pose[2]);
+	}
 
+	private void renderEyeViews(Geometry g) {
 		GLES20.glViewport(0, 0, surfaceWidth / 2, surfaceHeight);
-		Utils.noGlError();
-
 		Matrix.setIdentityM(shiftMatrix, 0);
 		Matrix.translateM(shiftMatrix, 0, -global.eyeShift / 2, 0, 0);
 		Matrix.setLookAtM(lookAtMatrix, 0,
-				-global.eyeDistance / 2, 0f, 0f,
-				-global.eyeDistance / 2, 0f, -5f,
+				-global.eyeDistance / 2 - global.cameraDistance, 0f, 0f,
+				-global.eyeDistance / 2 - global.cameraDistance, 0f, -5f,
 				0f, 1f, 0f);
-		Utils.noGlError();
-		Matrix.multiplyMM(viewMatrix, 0, lookAtMatrix, 0, rotationMatrix, 0);
+		Matrix.multiplyMM(viewMatrix, 0, lookAtMatrix, 0, poseMatrix, 0);
 		Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
 		Matrix.multiplyMM(vpsMatrix, 0, shiftMatrix, 0, vpMatrix, 0);
 		g.render(vpsMatrix);
 		Utils.noGlError();
 
 		GLES20.glViewport(surfaceWidth / 2, 0, surfaceWidth / 2, surfaceHeight);
-		Utils.noGlError();
 		Matrix.setIdentityM(shiftMatrix, 0);
 		Matrix.translateM(shiftMatrix, 0, global.eyeShift / 2, 0, 0);
 		Matrix.setLookAtM(lookAtMatrix, 0,
-				global.eyeDistance / 2, 0f, 0f,
-				global.eyeDistance / 2, 0f, -5f,
+				global.eyeDistance / 2 - global.cameraDistance, 0f, 0f,
+				global.eyeDistance / 2 - global.cameraDistance, 0f, -5f,
 				0f, 1f, 0f);
-		Matrix.multiplyMM(viewMatrix, 0, lookAtMatrix, 0, rotationMatrix, 0);
+		Matrix.multiplyMM(viewMatrix, 0, lookAtMatrix, 0, poseMatrix, 0);
 		Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
 		Matrix.multiplyMM(vpsMatrix, 0, shiftMatrix, 0, vpMatrix, 0);
 		g.render(vpsMatrix);

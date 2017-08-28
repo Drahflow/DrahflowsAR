@@ -35,7 +35,7 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 	private Stage acquireStage = new Stage() {
 		public void click() {
 			JNI.Gesture_setMarker(minX(), minY(), maxX(), maxY());
-			currentStage = nearStage;
+			currentStage = vrStage;
 		}
 
 		public void render() {
@@ -53,7 +53,6 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 
 			// Set program handles for cube drawing.
 			mvpMatrixHandle = GLES20.glGetUniformLocation(linkedShaderHandle, "u_MVPMatrix");
-			colorHandle = GLES20.glGetUniformLocation(linkedShaderHandle, "u_Color");
 			positionHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_Position");
 			texCoordsHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_TexCoordinate");
 			texSamplerHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "u_TexImage");
@@ -78,29 +77,55 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 		}
 	};
 
-	private Stage nearStage = new Stage() {
-		Cube cube = new Cube(0f, 0f, -0.15f, 0.005f);
+	private Stage vrStage = new Stage() {
+		Cube cube = new Cube(-0.01f, 0f, -0.2f, 0.005f);
+		float[] h = new float[9]; // the gesture transformation in camera coordinates
 
 		public void click() {
-			currentStage = farStage;
-		}
+			JNI.Gesture_getTransformationRelative(System.nanoTime(), h);
+			if(h[8] == 0) {
+				currentStage = acquireStage;
+				return;
+			}
 
-		public void render() {
-			cube.setTexture(global.gestureTracker.isTrackingEstablished()? Constants.GREEN: Constants.RED);
-			global.view.render(cube);
-		}
-	};
+			float distanceToCamera = (float)Math.sqrt(
+				-0.2 * -0.2 +
+				-0.01 * -0.01
+			);
 
-	private Stage farStage = new Stage() {
-		Cube cube = new Cube(0f, 0f, -0.2f, 0.005f);
+			float x = global.videoHistory.width / 4;
+			float y1 = global.videoHistory.height / 4 - 1.0f;
+			float y2 = global.videoHistory.height / 4 + 1.0f;
 
-		public void click() {
+			// apply transformation to given reference coordinates
+			float tx = x * h[0] + y1 * h[1] + h[2];
+			float ty = x * h[3] + y1 * h[4] + h[5];
+			float tw = x * h[6] + y1 * h[7] + h[8];
+
+			float bx = x * h[0] + y2 * h[1] + h[2];
+			float by = x * h[3] + y2 * h[4] + h[5];
+			float bw = x * h[6] + y2 * h[7] + h[8];
+
+			tx /= tw;
+			ty /= tw;
+			bx /= bw;
+			by /= bw;
+
+			float size = (float)Math.sqrt(
+				(tx - bx) * (tx - bx) +
+				(ty - by) * (ty - by)
+			);
+
+			float sizeAtOne = size * distanceToCamera;
+	
+			global.gestureSizeAtOne = sizeAtOne;
+
 			global.main.switchTo(new MainMenuActivity(global));
 		}
 
 		public void render() {
 			cube.setTexture(global.gestureTracker.isTrackingEstablished()? Constants.GREEN: Constants.RED);
-			global.view.render(cube);
+			global.view.renderUntracked(cube);
 		}
 	};
 
@@ -143,7 +168,6 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 	private float[] mvpMatrix = new float[16];
 	private float[] mvMatrix = new float[16];
 	private int mvpMatrixHandle;
-	private int colorHandle;
 	private int texSamplerHandle;
 
 	private int linkedShaderHandle;
@@ -290,7 +314,6 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 		Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
 		Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
 		GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
-		GLES20.glUniform4fv(colorHandle, 1, color, 0);
 
 		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
 		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, cameraTexture);
@@ -302,7 +325,6 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 	protected String getVertexShader() {
 		final String perPixelVertexShader =
 				"uniform mat4 u_MVPMatrix;      \n"
-			+ "uniform vec4 u_Color;          \n"
 			+ "attribute vec4 a_Position;     \n"
 			+ "attribute vec2 a_TexCoordinate;\n"
 			+ "varying vec4 v_Color;          \n"
@@ -310,7 +332,6 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 
 			+ "void main()                                \n"
 			+ "{                                          \n"
-			+ "   v_Color = u_Color;                      \n"
 			+ "   v_TexCoordinate = a_TexCoordinate;      \n"
 			+ "   gl_Position = u_MVPMatrix * a_Position; \n"
 			+ "}                                          \n";
@@ -322,7 +343,6 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 		final String perPixelFragmentShader =
 				"precision mediump float;\n"
 			+ "uniform sampler2D u_TexImage;\n"
-			+ "varying vec4 v_Color;\n"
 			+ "varying vec2 v_TexCoordinate;\n"
 			+ "void main() {\n"
 			+ "   gl_FragColor = texture2D(u_TexImage, v_TexCoordinate); \n"

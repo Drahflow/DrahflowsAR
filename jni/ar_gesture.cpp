@@ -198,6 +198,12 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_Gesture_1processFrame
 JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_Gesture_1getTransformationRelative
   (JNIEnv *env, jclass, jlong time_nano, jfloatArray transformation) {
 
+  if(env->IsSameObject(transformation, nullptr)) {
+    env->ThrowNew(env->FindClass("java/lang/NullPointerException"),
+        "null passed for output buffer");
+    return;
+  }
+
   jfloat *transformationData = env->GetFloatArrayElements(transformation, 0);
 
   if(fingerTransformation.rows == 3 && fingerTransformation.cols == 3) {
