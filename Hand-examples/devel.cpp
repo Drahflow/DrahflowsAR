@@ -34,7 +34,7 @@ const float CIRATEFI_CIRCLE_THRESHOLD_SHIFTED = 0.85;
 const float CIRATEFI_RADIAL_THRESHOLD = 0.65;
 const float CIRATEFI_ORTHOGONAL_THRESHOLD = 0.70;
 const float CIRATEFI_PARALLEL_THRESHOLD = 0.75;
-const float CIRATEFI_ALL_THRESHOLD = 0.65;
+const float CIRATEFI_ALL_THRESHOLD = 0.70;
 const float CIRATEFI_ALL_STEPS = 0.26;
 
 struct InterpolatedValue {
@@ -43,7 +43,6 @@ struct InterpolatedValue {
 };
 
 InterpolatedValue interpolate(Mat &img, float x, float y, unsigned char draw) {
-
   int lx = x;
   int ly = y;
   if(lx < 0 || ly < 0) {
@@ -556,8 +555,8 @@ AllMatchQuality compareAll(const ObjectDescription &obj,
 
               for(float yy = ly; yy < ly + 1; yy += CIRATEFI_ALL_STEPS) {
                 for(float xx = lx; xx < lx + 1; xx += CIRATEFI_ALL_STEPS) {
-                  float ix = sx + lx * wxi + ly * hxi;
-                  float iy = sy + lx * wyi + ly * hyi;
+                  float ix = sx + xx * wxi + yy * hxi;
+                  float iy = sy + xx * wyi + yy * hyi;
 
                   auto v = interpolate(img, ix, iy, 255);
                   if(!v.exists) {
@@ -601,9 +600,9 @@ int main(int, char**)
     Mat reference = imread("svo.0120.png", IMREAD_COLOR );
     // Mat query = imread("svo.0120.png", IMREAD_COLOR );
     // Mat query = imread("svo.0121.png", IMREAD_COLOR );
-    // Mat query = imread("svo.0011.png", IMREAD_COLOR );
+    Mat query = imread("svo.0011.png", IMREAD_COLOR );
     // Mat query = imread("svo.0021.png", IMREAD_COLOR );
-    Mat query = imread("svo.0052.png", IMREAD_COLOR );
+    // Mat query = imread("svo.0052.png", IMREAD_COLOR );
     // Mat query = imread("svo.0123.png", IMREAD_COLOR );
 
     // Pretty drastic illumination changes on the fingers
