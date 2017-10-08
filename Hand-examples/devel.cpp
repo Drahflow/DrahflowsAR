@@ -19,7 +19,7 @@ struct ObjectDescription {
 };
 
 const int CIRATEFI_CIRCLES = 15;
-const int CIRATEFI_RADIALS = 256;
+const int CIRATEFI_RADIALS = 64;
 const int CIRATEFI_ORTHOGONALS = 16;
 const int CIRATEFI_PARALLELS = 16;
 const float CIRATEFI_CIRCLE_DIVISOR = 1.07;
@@ -36,6 +36,8 @@ const float CIRATEFI_ORTHOGONAL_THRESHOLD = 0.70;
 const float CIRATEFI_PARALLEL_THRESHOLD = 0.75;
 const float CIRATEFI_ALL_THRESHOLD = 0.70;
 const float CIRATEFI_ALL_STEPS = 0.26;
+const float CIRATEFI_FINAL_WIGGLES = 30;
+const float CIRATEFI_FINAL_WIGGLE_STEP = 0.1;
 
 struct InterpolatedValue {
   float v;
@@ -523,72 +525,80 @@ ParallelMatchQuality compareParallels(const ObjectDescription &obj,
 struct AllMatchQuality {
   float score;
   float beta, gamma;
-  float wxi, wyi, hxi, hyi;
+  float wx, wy, hx, hy;
 };
+
+AllMatchQuality compareAllMatrix(const ObjectDescription &obj,
+    Mat &img, int x, int y, float wx, float wy, float hx, float hy) {
+  AllMatchQuality result;
+  std::vector<float> measured;
+  float bestCorrelation = 0.0;
+
+  int sx = x - (obj.w / 2.0) * wx - (obj.h / 2.0) * hx;
+  int sy = y - (obj.w / 2.0) * wy - (obj.h / 2.0) * hy;
+
+  for(int ly = 0; ly < obj.h; ++ly) {
+    for(int lx = 0; lx < obj.w; ++lx) {
+      float sum = 0;
+      int count = 0;
+
+      for(float yy = ly; yy < ly + 1; yy += CIRATEFI_ALL_STEPS) {
+        for(float xx = lx; xx < lx + 1; xx += CIRATEFI_ALL_STEPS) {
+          float ix = sx + xx * wx + yy * hx;
+          float iy = sy + xx * wy + yy * hy;
+
+          auto v = interpolate(img, ix, iy, 255);
+          if(!v.exists) {
+            result.score = 0;
+            return result;
+          }
+
+          sum += v.v;
+          count++;
+        }
+      }
+
+      measured.push_back(sum / count);
+    }
+  }
+
+  auto corrCoeff = correlationCoefficient(
+    obj.allValues.begin(), obj.allValues.end(),
+    measured.begin(), measured.end(),
+    obj.h * obj.w);
+  if(fabs(corrCoeff.corr) > bestCorrelation) {
+    bestCorrelation = fabs(corrCoeff.corr);
+    result.beta = corrCoeff.beta;
+    result.gamma = corrCoeff.gamma;
+    result.score = bestCorrelation;
+    result.wx = wx;
+    result.wy = wy;
+    result.hx = hx;
+    result.hy = hy;
+  }
+
+  return result;
+}
 
 AllMatchQuality compareAll(const ObjectDescription &obj,
     Mat &img, int x, int y, float scale, float angle,
     float yCorrection, float xCorrection) {
-  AllMatchQuality result;
-  result.score = 0;
-
-  float bestCorrelation = 0.0;
-
   float wx = scale * xCorrection * sin(angle + 0.5 * M_PI);
   float wy = scale * xCorrection * cos(angle + 0.5 * M_PI);
   float hx = scale * yCorrection * sin(angle);
   float hy = scale * yCorrection * cos(angle);
 
-  for(float wxi = wx - 0.1; wxi < wx + 0.1; wxi += 0.025) {
-    for(float wyi = wy - 0.1; wyi < wy + 0.1; wyi += 0.025) {
-      for(float hxi = hx - 0.1; hxi < hx + 0.1; hxi += 0.025) {
-        for(float hyi = hy - 0.1; hyi < hy + 0.1; hyi += 0.025) {
-          std::vector<float> measured;
+  auto result = compareAllMatrix(obj, img, x, y, wx, wy, hx, hy);
+  for(int n = 0; n < CIRATEFI_FINAL_WIGGLES; ++n) {
+    float nwx = wx + sin(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
+    float nwy = wy + sin(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
+    float nhx = hx + sin(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
+    float nhy = hy + sin(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
 
-          int sx = x - (obj.w / 2.0) * wxi - (obj.h / 2.0) * hxi;
-          int sy = y - (obj.w / 2.0) * wyi - (obj.h / 2.0) * hyi;
-
-          for(int ly = 0; ly < obj.h; ++ly) {
-            for(int lx = 0; lx < obj.w; ++lx) {
-              float sum = 0;
-              int count = 0;
-
-              for(float yy = ly; yy < ly + 1; yy += CIRATEFI_ALL_STEPS) {
-                for(float xx = lx; xx < lx + 1; xx += CIRATEFI_ALL_STEPS) {
-                  float ix = sx + xx * wxi + yy * hxi;
-                  float iy = sy + xx * wyi + yy * hyi;
-
-                  auto v = interpolate(img, ix, iy, 255);
-                  if(!v.exists) {
-                    result.score = 0;
-                    return result;
-                  }
-
-                  sum += v.v;
-                  count++;
-                }
-              }
-
-              measured.push_back(sum / count);
-            }
-          }
-
-          auto corrCoeff = correlationCoefficient(
-            obj.allValues.begin(), obj.allValues.end(),
-            measured.begin(), measured.end(),
-            obj.h * obj.w);
-          if(fabs(corrCoeff.corr) > bestCorrelation) {
-            bestCorrelation = fabs(corrCoeff.corr);
-            result.beta = corrCoeff.beta;
-            result.gamma = corrCoeff.gamma;
-            result.score = bestCorrelation;
-            result.wxi = wxi;
-            result.wyi = wyi;
-            result.hxi = hxi;
-            result.hyi = hyi;
-          }
-        }
-      }
+    auto nresult = compareAllMatrix(obj, img, x, y, nwx, nwy, nhx, nhy);
+    if(nresult.score > result.score) {
+      result = nresult;
+      wx = nwx; wy = nwy; hx = nhx; hy = nhy;
     }
   }
 
@@ -629,7 +639,7 @@ int main(int, char**)
 
     for(int y = 0; y < query.rows; ++y) {
     // for(int y = sy; y < ey; ++y) {
-    // for(int y = 210; y < 220; ++y) {
+    // for(int y = 220; y < 223; ++y) {
       cout << y << endl;
       for(int x = 0; x < query.cols; ++x) {
       // for(int x = sx; x < ex; ++x) {
@@ -691,12 +701,12 @@ int main(int, char**)
       }
     }
 
-    namedWindow("Display window", WINDOW_AUTOSIZE);
-    imshow("Display window", reference);
+    // namedWindow("Display window", WINDOW_AUTOSIZE);
+    // imshow("Display window", reference);
 
-    namedWindow("Display window 2", WINDOW_AUTOSIZE);
-    imshow("Display window 2", query);
+    // namedWindow("Display window 2", WINDOW_AUTOSIZE);
+    // imshow("Display window 2", query);
 
-    waitKey(0);
+    // waitKey(0);
     return 0;
 }
