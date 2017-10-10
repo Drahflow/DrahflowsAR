@@ -39,22 +39,17 @@ const float CIRATEFI_ALL_STEPS = 0.26;
 const float CIRATEFI_FINAL_WIGGLES = 30;
 const float CIRATEFI_FINAL_WIGGLE_STEP = 0.1;
 
-struct InterpolatedValue {
-  float v;
-  bool exists;
-};
-
-InterpolatedValue interpolate(Mat &img, float x, float y, unsigned char draw) {
+float interpolate(Mat &img, float x, float y, unsigned char draw) {
   int lx = x;
   int ly = y;
   if(lx < 0 || ly < 0) {
-    return { 0, false, };
+    return -1e6;
   }
 
   int hx = lx + 1;
   int hy = ly + 1;
   if(hx >= img.cols || hy >= img.rows) {
-    return { 0, false, };
+    return -1e6;
   }
 
   float weight_x = x - lx;
@@ -70,10 +65,7 @@ InterpolatedValue interpolate(Mat &img, float x, float y, unsigned char draw) {
 
   img.at<rgb>(ly, lx).b = std::max(draw, img.at<rgb>(ly, lx).b);
 
-  return {
-    weight_x * hcol + (1 - weight_x) * lcol,
-    true,
-  };
+  return weight_x * hcol + (1 - weight_x) * lcol;
 }
 
 ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
@@ -92,11 +84,8 @@ ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
     float count = 0;
 
     for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-      auto v = interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 255);
-      if(v.exists) {
-        sum += v.v;
-        count++;
-      }
+      sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 255);
+      count++;
     }
     // cout << "c (" << ri << "," << count << "): " << sum / count << endl;
     result.circleValues.push_back(sum / count);
@@ -110,11 +99,8 @@ ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
     float count = 0;
 
     for(float ri = 0; ri < r; ++ri) {
-      auto v = interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 128);
-      if(v.exists) {
-        sum += v.v;
-        count++;
-      }
+      sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 128);
+      count++;
     }
     alpha += 2 * M_PI / CIRATEFI_RADIALS;
 
@@ -128,11 +114,8 @@ ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
     float count = 0;
 
     for(float x = sx; x < ex; ++x) {
-      auto v = interpolate(img, x, y, 128);
-      if(v.exists) {
-        sum += v.v;
-        count++;
-      }
+      sum += interpolate(img, x, y, 128);
+      count++;
     }
 
     result.orthogonalValues.push_back(sum / count);
@@ -145,11 +128,8 @@ ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
     float count = 0;
 
     for(float y = sy; y < ey; ++y) {
-      auto v = interpolate(img, x, y, 255);
-      if(v.exists) {
-        sum += v.v;
-        count++;
-      }
+      sum += interpolate(img, x, y, 255);
+      count++;
     }
 
     result.parallelValues.push_back(sum / count);
@@ -162,11 +142,8 @@ ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
 
       for(float yy = y; yy < y + 1; yy += CIRATEFI_ALL_STEPS) {
         for(float xx = x; xx < x + 1; xx += CIRATEFI_ALL_STEPS) {
-          auto v = interpolate(img, xx, yy, 0);
-          if(v.exists) {
-            sum += v.v;
-            count++;
-          }
+          sum += interpolate(img, xx, yy, 0);
+          count++;
         }
       }
 
@@ -266,20 +243,21 @@ CircleMatchQuality compareCircles(const ObjectDescription &obj,
   for(; ri < rs; ri *= CIRATEFI_CIRCLE_DIVISOR);
   const float rMax = ri;
   for(; ri > re; ri /= CIRATEFI_CIRCLE_DIVISOR) {
-    float len = 2 * M_PI * ri;
-    float sum = 0;
-    float count = 0;
+    if(x - ri < 0 || y - ri < 0 || x + ri >= img.cols || y + ri >= img.rows) {
+      measured.push_back(-1e6);
+    } else {
+      float len = 2 * M_PI * ri;
+      float sum = 0;
+      float count = 0;
 
-    for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-      auto v = interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 64);
-      if(v.exists) {
-        sum += v.v;
+      for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
+        sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 64);
         count++;
       }
-    }
 
-    // cout << "m (" << ri << "," << count << "): " << sum / count << endl;
-    measured.push_back(sum / count);
+      // cout << "m (" << ri << "," << count << "): " << sum / count << endl;
+      measured.push_back(sum / count);
+    }
   }
 
   int bestIndex = 0;
@@ -325,11 +303,8 @@ CircleMatchQuality compareCirclesShifted(const ObjectDescription &obj,
       float count = 0;
 
       for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-        auto v = interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 64);
-        if(v.exists) {
-          sum += v.v;
-          count++;
-        }
+        sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 64);
+        count++;
       }
 
       measured.push_back(sum / count);
@@ -374,11 +349,8 @@ RadialMatchQuality compareRadials(const ObjectDescription &obj,
     float count = 0;
 
     for(float ri = 0; ri < r; ++ri) {
-      auto v = interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 128);
-      if(v.exists) {
-        sum += v.v;
-        count++;
-      }
+      sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 128);
+      count++;
     }
     alpha += 2 * M_PI / CIRATEFI_RADIALS;
 
@@ -440,11 +412,8 @@ OrthogonalMatchQuality compareOrthogonals(const ObjectDescription &obj,
         float ix = sx + lx * wx + ly * hx;
         float iy = sy + lx * wy + ly * hy;
 
-        auto v = interpolate(img, ix, iy, 128);
-        if(v.exists) {
-          sum += v.v;
-          count++;
-        }
+        sum += interpolate(img, ix, iy, 128);
+        count++;
       }
 
       measured.push_back(sum / count);
@@ -497,11 +466,8 @@ ParallelMatchQuality compareParallels(const ObjectDescription &obj,
         float ix = sx + lx * wx + ly * hx;
         float iy = sy + lx * wy + ly * hy;
 
-        auto v = interpolate(img, ix, iy, 128);
-        if(v.exists) {
-          sum += v.v;
-          count++;
-        }
+        sum += interpolate(img, ix, iy, 128);
+        count++;
       }
 
       measured.push_back(sum / count);
@@ -531,6 +497,8 @@ struct AllMatchQuality {
 AllMatchQuality compareAllMatrix(const ObjectDescription &obj,
     Mat &img, int x, int y, float wx, float wy, float hx, float hy) {
   AllMatchQuality result;
+  result.score = 0;
+
   std::vector<float> measured;
   float bestCorrelation = 0.0;
 
@@ -547,13 +515,7 @@ AllMatchQuality compareAllMatrix(const ObjectDescription &obj,
           float ix = sx + xx * wx + yy * hx;
           float iy = sy + xx * wy + yy * hy;
 
-          auto v = interpolate(img, ix, iy, 255);
-          if(!v.exists) {
-            result.score = 0;
-            return result;
-          }
-
-          sum += v.v;
+          sum += interpolate(img, ix, iy, 255);
           count++;
         }
       }
