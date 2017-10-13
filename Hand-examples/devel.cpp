@@ -17,6 +17,7 @@ struct ObjectDescription {
   std::vector<float> orthogonalValues;
   std::vector<float> parallelValues;
   std::vector<float> allValues;
+  float allValuesRange;
 };
 
 const bool CIRATEFI_POSITIVE_ONLY = true;
@@ -43,6 +44,18 @@ const float CIRATEFI_ALL_THRESHOLD = 0.70;
 const float CIRATEFI_ALL_STEPS = 0.26;
 const float CIRATEFI_FINAL_WIGGLES = 30;
 const float CIRATEFI_FINAL_WIGGLE_STEP = 0.1;
+
+class Image {
+  private:
+    Mat data;
+    Mat interpolationCache;
+
+  public:
+    Image(Mat &img) {
+      data = img.clone();
+      interpolationCache = Mat(data.rows * 16, data.cols * 16, CV_8UC1);
+    }
+};
 
 float interpolate(Mat &img, float x, float y, unsigned char) {
   int lx = x;
@@ -293,12 +306,19 @@ ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
     }
   }
 
+  float allMean = mean(result.allValues.begin(), result.allValues.end());
+  result.allValuesRange = meanDotProduct(
+      result.allValues.begin(), result.allValues.end(), allMean,
+      result.allValues.begin(), result.allValues.end(), allMean
+  ) / result.allValues.size();
+
   return result;
 }
 
 struct CircleMatchQuality {
   float score;
   float scale;
+  float beta, gamma;
 };
 
 CircleMatchQuality compareCirclesPyramid(const ObjectDescription &obj,
@@ -348,18 +368,24 @@ CircleMatchQuality compareCirclesPyramid(const ObjectDescription &obj,
   }
 
   int bestIndex = 0;
-  float bestCorrelation = 0.0;
+  CorrelationCoefficient<float> bestCorrelation;
+  bestCorrelation.corr = 0;
+  bestCorrelation.beta = 0;
+  bestCorrelation.gamma = 0;
+
   for(size_t i = 0; i < measured.size() - CIRATEFI_CIRCLES + 1; ++i) {
-    float corrCoeff = correlationCoefficientLeftConst(
+    auto corrCoeff = correlationCoefficientLeftConst(
       obj.circleValues.begin(), obj.circleValues.end(), obj.circleValuesMean, obj.circleValuesSquared,
-      measured.begin() + i, measured.begin() + i + CIRATEFI_CIRCLES).corr;
-    if(fabs(corrCoeff) > bestCorrelation) {
-      bestCorrelation = fabs(corrCoeff);
+      measured.begin() + i, measured.begin() + i + CIRATEFI_CIRCLES);
+    if(fabs(corrCoeff.corr) > bestCorrelation.corr) {
+      bestCorrelation = corrCoeff;
       bestIndex = i;
     }
   }
 
-  result.score = bestCorrelation;
+  result.score = fabs(bestCorrelation.corr);
+  result.beta = bestCorrelation.beta;
+  result.gamma = bestCorrelation.gamma;
   result.scale = rMax / (r * pow(CIRATEFI_CIRCLE_DIVISOR, bestIndex));
   return result;
 }
@@ -789,6 +815,34 @@ std::vector<Mat> buildImagePyramid(Mat img) {
   return ret;
 }
 
+template<class F> Mat buildExtremumImage(Mat &img, int range, const F &f) {
+  Mat ret = img.clone();
+
+  for(int i = 0; i < range; ++i) {
+    Mat next = ret.clone();
+    for(int y = 0; y < ret.rows; ++y) {
+      for(int x = 0; x < ret.cols; ++x) {
+        unsigned char ext = ret.at<rgb>(y, x).r;
+
+        // if(x > 0 && y > 0)                   ext = f(ext, ret.at<rgb>(y - 1, x - 1).r);
+        if(x > 0)                            ext = f(ext, ret.at<rgb>(y,     x - 1).r);
+        // if(x > 0 && y < img.rows - 1)        ext = f(ext, ret.at<rgb>(y + 1, x - 1).r);
+        if(y > 0)                            ext = f(ext, ret.at<rgb>(y - 1, x).r);
+        if(y < img.rows - 1)                 ext = f(ext, ret.at<rgb>(y + 1, x).r);
+        //if(x < img.cols && y > 0)            ext = f(ext, ret.at<rgb>(y - 1, x + 1).r);
+        if(x < img.cols)                     ext = f(ext, ret.at<rgb>(y,     x + 1).r);
+        // if(x < img.cols && y < img.rows - 1) ext = f(ext, ret.at<rgb>(y + 1, x + 1).r);
+
+        next.at<rgb>(y, x).r = ext;
+      }
+    }
+
+    ret = next;
+  }
+
+  return ret;
+}
+
 int main(int, char**)
 {
     Mat reference = imread("svo.0120.png", IMREAD_COLOR );
@@ -801,7 +855,6 @@ int main(int, char**)
 
     // Pretty drastic illumination changes on the fingers
     // Mat query = imread("svo.0112.png", IMREAD_COLOR );
-    auto queryPyramid = buildImagePyramid(query);
 
     if(reference.empty() || query.empty()) {
         cout <<  "Could not open or find the image" << endl ;
@@ -822,11 +875,20 @@ int main(int, char**)
 
     auto hand = measureObject(reference, sx, sy, ex, ey);
 
+    auto queryPyramid = buildImagePyramid(query);
+    auto minImage = buildExtremumImage(queryPyramid[2], 16,
+        static_cast<const unsigned char &(*)(const unsigned char &, const unsigned char&)>(std::min));
+    auto maxImage = buildExtremumImage(queryPyramid[2], 16,
+        static_cast<const unsigned char &(*)(const unsigned char &, const unsigned char&)>(std::max));
+
     for(int y = 0; y < query.rows; ++y) {
     // for(int y = sy; y < ey; ++y) {
     // for(int y = 220; y < 223; ++y) {
       cout << y << endl;
       for(int x = 0; x < query.cols; ++x) {
+        float range = maxImage.at<rgb>(y / 4, x / 4).r - minImage.at<rgb>(y / 4, x / 4).r;
+        if(range * range < hand.allValuesRange) continue;
+
       // for(int x = sx; x < ex; ++x) {
       // for(int x = 230; x < 270; ++x) {
     // do {
@@ -888,6 +950,8 @@ int main(int, char**)
           << " β: " << allMatch.beta
           << " γ: " << allMatch.gamma
           << " P: " << circleMatchPyramid.score
+          << " cPβ: " << circleMatchPyramid.beta
+          << " cPγ: " << circleMatchPyramid.gamma
           // << " P: " << circleMatchPyramid2.score
           << endl;
 
@@ -903,6 +967,12 @@ int main(int, char**)
 
     namedWindow("Display window 3", WINDOW_AUTOSIZE);
     imshow("Display window 3", queryPyramid[1]);
+
+    namedWindow("Display window min", WINDOW_AUTOSIZE);
+    imshow("Display window min", minImage);
+
+    namedWindow("Display window max", WINDOW_AUTOSIZE);
+    imshow("Display window max", maxImage);
 
     waitKey(0);
     return 0;
