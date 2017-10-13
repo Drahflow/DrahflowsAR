@@ -971,8 +971,8 @@ int main(int, char**)
 {
     Mat reference = imread("svo.0120.png", IMREAD_COLOR );
     // Mat query = imread("svo.0120.png", IMREAD_COLOR );
-    Mat query = imread("svo.0121.png", IMREAD_COLOR );
-    // Mat query = imread("svo.0011.png", IMREAD_COLOR );
+    // Mat query = imread("svo.0121.png", IMREAD_COLOR );
+    Mat query = imread("svo.0011.png", IMREAD_COLOR );
     // Mat query = imread("svo.0021.png", IMREAD_COLOR );
     // Mat query = imread("svo.0052.png", IMREAD_COLOR );
     // Mat query = imread("svo.0123.png", IMREAD_COLOR );
@@ -1022,7 +1022,7 @@ int main(int, char**)
         // int y = (sy + ey) / 2;
         auto circleMatchCoarse = compareCirclesPyramidCoarse(hand, queryPyramid, x, y, 5);
         if(circleMatchCoarse.score < 0.1) {
-          x += 2;
+          x++;
           continue;
         }
 
@@ -1033,43 +1033,45 @@ int main(int, char**)
         auto circleMatchPyramid = compareCirclesPyramid(hand, queryPyramid, x, y, 20);
         if(circleMatchPyramid.score < CIRATEFI_CIRCLE_THRESHOLD_PYRAMID) continue;
 
-        query.at<rgb>(y, x).g = 64;
+        //query.at<rgb>(y, x).g = 64;
 
         auto circleMatch = compareCircles(hand, queryImage, x, y, circleMatchPyramid.scale);
         // cout << circleMatch.score << endl;
         if(circleMatch.score < CIRATEFI_CIRCLE_THRESHOLD) continue;
 
-        query.at<rgb>(y, x).g = 80;
+        //query.at<rgb>(y, x).g = 80;
 
         auto circleMatchShifted = compareCirclesShifted(hand, queryImage, x, y, circleMatch.scale);
         if(circleMatchShifted.score < CIRATEFI_CIRCLE_THRESHOLD_SHIFTED) continue;
 
-        query.at<rgb>(y, x).g = 128;
+        //query.at<rgb>(y, x).g = 128;
 
         auto radialMatch = compareRadials(hand, queryImage, x, y, circleMatchShifted.scale);
         if(radialMatch.score < CIRATEFI_RADIAL_THRESHOLD) continue;
 
-        query.at<rgb>(y, x).g = 192;
+        //query.at<rgb>(y, x).g = 192;
 
         auto orthogonalMatch = compareOrthogonals(hand, queryImage, x, y,
             circleMatchShifted.scale, radialMatch.angle);
         if(orthogonalMatch.score < CIRATEFI_ORTHOGONAL_THRESHOLD) continue;
 
-        query.at<rgb>(y, x).b = 64;
+        //query.at<rgb>(y, x).b = 64;
 
         auto parallelMatch = compareParallels(hand, queryImage, x, y,
             circleMatchShifted.scale, radialMatch.angle, orthogonalMatch.yCorrection);
         if(parallelMatch.score < CIRATEFI_PARALLEL_THRESHOLD) continue;
 
-        query.at<rgb>(y, x).b = 128;
+        query.at<rgb>(y, x).b = 255;
+
+        //query.at<rgb>(y, x).b = 128;
 
         auto allMatch = compareAll(hand, queryImage, x, y,
             circleMatchShifted.scale, radialMatch.angle,
             orthogonalMatch.yCorrection, parallelMatch.xCorrection);
         if(allMatch.score < CIRATEFI_ALL_THRESHOLD) continue;
 
-        query.at<rgb>(y, x).b = 255;
         query.at<rgb>(y, x).g = 255;
+        //query.at<rgb>(y, x).g = 255;
 
         cout
           << "x,y: " << x << "," << y
@@ -1100,8 +1102,8 @@ int main(int, char**)
     // namedWindow("Display window", WINDOW_AUTOSIZE);
     // imshow("Display window", reference);
 
-    // namedWindow("Display window 2", WINDOW_AUTOSIZE);
-    // imshow("Display window 2", query);
+    namedWindow("Display window 2", WINDOW_AUTOSIZE);
+    imshow("Display window 2", query);
 
     // namedWindow("Display window 3", WINDOW_AUTOSIZE);
     // imshow("Display window 3", queryPyramid[1].data);
@@ -1112,6 +1114,6 @@ int main(int, char**)
     // namedWindow("Display window max", WINDOW_AUTOSIZE);
     // imshow("Display window max", maxImage);
 
-    // waitKey(0);
+    waitKey(0);
     return 0;
 }
