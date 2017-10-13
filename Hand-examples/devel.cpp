@@ -30,8 +30,8 @@ const float CIRATEFI_CIRCLE_SHIFT = 1.007;
 const float CIRATEFI_CIRCLE_DENSITY = 0.5;
 const float CIRATEFI_MAGNIFICATION_FACTOR = 3;
 const float CIRATEFI_MINIFICATION_FACTOR = 0.3;
-const float CIRATEFI_CONTRAST_THRESHOLD = 0.2;
-const float CIRATEFI_BRIGHTNESS_THRESHOLD = 100;
+const float CIRATEFI_CONTRAST_THRESHOLD = 0.5;
+const float CIRATEFI_BRIGHTNESS_THRESHOLD = 50;
 const float CIRATEFI_CIRCLE_THRESHOLD_PYRAMID = 0.70;
 const float CIRATEFI_CIRCLE_THRESHOLD = 0.80;
 const float CIRATEFI_CIRCLE_THRESHOLD_SHIFTED = 0.85;
@@ -44,7 +44,7 @@ const float CIRATEFI_ALL_STEPS = 0.26;
 const float CIRATEFI_FINAL_WIGGLES = 30;
 const float CIRATEFI_FINAL_WIGGLE_STEP = 0.1;
 
-float interpolate(Mat &img, float x, float y, unsigned char draw) {
+float interpolate(Mat &img, float x, float y, unsigned char) {
   int lx = x;
   int ly = y;
   if(lx < 0 || ly < 0) {
@@ -68,7 +68,7 @@ float interpolate(Mat &img, float x, float y, unsigned char draw) {
   float lcol = weight_y * v00 + (1 - weight_y) * v01;
   float hcol = weight_y * v10 + (1 - weight_y) * v11;
 
-  img.at<rgb>(ly, lx).b = std::max(draw, img.at<rgb>(ly, lx).b);
+  // img.at<rgb>(ly, lx).b = std::max(draw, img.at<rgb>(ly, lx).b);
 
   return weight_x * hcol + (1 - weight_x) * lcol;
 }
@@ -217,7 +217,7 @@ ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
     float count = 0;
 
     for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-      sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 255);
+      sum += interpolate(img, cx + ri * sinf(alpha), cy + ri * cosf(alpha), 255);
       count++;
     }
     // cout << "c (" << ri << "," << count << "): " << sum / count << endl;
@@ -241,7 +241,7 @@ ObjectDescription measureObject(Mat &img, int sx, int sy, int ex, int ey) {
     float count = 0;
 
     for(float ri = 0; ri < r; ++ri) {
-      sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 128);
+      sum += interpolate(img, cx + ri * sinf(alpha), cy + ri * cosf(alpha), 128);
       count++;
     }
     alpha += 2 * M_PI / CIRATEFI_RADIALS;
@@ -339,7 +339,7 @@ CircleMatchQuality compareCirclesPyramid(const ObjectDescription &obj,
 
       float len = 2 * M_PI * rj;
       for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-        sum += interpolate(img, cxj + rj * sin(alpha), cyj + rj * cos(alpha), 64);
+        sum += interpolate(img, cxj + rj * sinf(alpha), cyj + rj * cosf(alpha), 64);
         count++;
       }
 
@@ -398,7 +398,7 @@ CircleMatchQuality compareCirclesPyramid(const ObjectDescription &obj,
 
       float len = 2 * M_PI * rj;
       for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-        sum += interpolate(img, cxj + rj * sin(alpha), cyj + rj * cos(alpha), 64);
+        sum += interpolate(img, cxj + rj * sinf(alpha), cyj + rj * cosf(alpha), 64);
         count++;
       }
 
@@ -448,7 +448,7 @@ CircleMatchQuality compareCircles(const ObjectDescription &obj,
       float count = 0;
 
       for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-        sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 64);
+        sum += interpolate(img, cx + ri * sinf(alpha), cy + ri * cosf(alpha), 64);
         count++;
       }
 
@@ -500,7 +500,7 @@ CircleMatchQuality compareCirclesShifted(const ObjectDescription &obj,
       float count = 0;
 
       for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-        sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 64);
+        sum += interpolate(img, cx + ri * sinf(alpha), cy + ri * cosf(alpha), 64);
         count++;
       }
 
@@ -545,7 +545,7 @@ RadialMatchQuality compareRadials(const ObjectDescription &obj,
     float count = 0;
 
     for(float ri = 0; ri < r; ++ri) {
-      sum += interpolate(img, cx + ri * sin(alpha), cy + ri * cos(alpha), 128);
+      sum += interpolate(img, cx + ri * sinf(alpha), cy + ri * cosf(alpha), 128);
       count++;
     }
     alpha += 2 * M_PI / CIRATEFI_RADIALS;
@@ -590,10 +590,10 @@ OrthogonalMatchQuality compareOrthogonals(const ObjectDescription &obj,
   for(float yCorrection = 0.8; yCorrection < 1.2; yCorrection += 0.01) {
     std::vector<float> measured;
 
-    float wx = scale * sin(angle + 0.5 * M_PI);
-    float wy = scale * cos(angle + 0.5 * M_PI);
-    float hx = scale * yCorrection * sin(angle);
-    float hy = scale * yCorrection * cos(angle);
+    float wx = scale * sinf(angle + 0.5 * M_PI);
+    float wy = scale * cosf(angle + 0.5 * M_PI);
+    float hx = scale * yCorrection * sinf(angle);
+    float hy = scale * yCorrection * cosf(angle);
 
     int sx = x - (obj.w / 2.0) * wx - (obj.h / 2.0) * hx;
     int sy = y - (obj.w / 2.0) * wy - (obj.h / 2.0) * hy;
@@ -643,10 +643,10 @@ ParallelMatchQuality compareParallels(const ObjectDescription &obj,
   for(float xCorrection = 0.7; xCorrection < 1.3; xCorrection += 0.01) {
     std::vector<float> measured;
 
-    float wx = scale * xCorrection * sin(angle + 0.5 * M_PI);
-    float wy = scale * xCorrection * cos(angle + 0.5 * M_PI);
-    float hx = scale * yCorrection * sin(angle);
-    float hy = scale * yCorrection * cos(angle);
+    float wx = scale * xCorrection * sinf(angle + 0.5 * M_PI);
+    float wy = scale * xCorrection * cosf(angle + 0.5 * M_PI);
+    float hx = scale * yCorrection * sinf(angle);
+    float hy = scale * yCorrection * cosf(angle);
 
     int sx = x - (obj.w / 2.0) * wx - (obj.h / 2.0) * hx;
     int sy = y - (obj.w / 2.0) * wy - (obj.h / 2.0) * hy;
@@ -737,10 +737,10 @@ AllMatchQuality compareAllMatrix(const ObjectDescription &obj,
 AllMatchQuality compareAll(const ObjectDescription &obj,
     Mat &img, int x, int y, float scale, float angle,
     float yCorrection, float xCorrection) {
-  float wx = scale * xCorrection * sin(angle + 0.5 * M_PI);
-  float wy = scale * xCorrection * cos(angle + 0.5 * M_PI);
-  float hx = scale * yCorrection * sin(angle);
-  float hy = scale * yCorrection * cos(angle);
+  float wx = scale * xCorrection * sinf(angle + 0.5 * M_PI);
+  float wy = scale * xCorrection * cosf(angle + 0.5 * M_PI);
+  float hx = scale * yCorrection * sinf(angle);
+  float hy = scale * yCorrection * cosf(angle);
 
   auto result = compareAllMatrix(obj, img, x, y, wx, wy, hx, hy);
   if(result.score < CIRATEFI_ALL_EARLY_THRESHOLD) {
@@ -748,10 +748,10 @@ AllMatchQuality compareAll(const ObjectDescription &obj,
   }
 
   for(int n = 0; n < CIRATEFI_FINAL_WIGGLES; ++n) {
-    float nwx = wx + sin(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
-    float nwy = wy + sin(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
-    float nhx = hx + sin(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
-    float nhy = hy + sin(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
+    float nwx = wx + sinf(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
+    float nwy = wy + sinf(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
+    float nhx = hx + sinf(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
+    float nhy = hy + sinf(rand()) * CIRATEFI_FINAL_WIGGLE_STEP;
 
     auto nresult = compareAllMatrix(obj, img, x, y, nwx, nwy, nhx, nhy);
     if(nresult.score > result.score) {
@@ -841,40 +841,37 @@ int main(int, char**)
         // cout << circleMatch.score << endl;
         if(circleMatch.score < CIRATEFI_CIRCLE_THRESHOLD) continue;
 
-        // query.at<rgb>(y, x).g = 255;
-
-        // query.at<rgb>(y, x).g = 20;
+        query.at<rgb>(y, x).g = 80;
 
         auto circleMatchShifted = compareCirclesShifted(hand, query, x, y, circleMatch.scale);
         if(circleMatchShifted.score < CIRATEFI_CIRCLE_THRESHOLD_SHIFTED) continue;
 
-        // query.at<rgb>(y, x).g = 40;
+        query.at<rgb>(y, x).g = 128;
 
         auto radialMatch = compareRadials(hand, query, x, y, circleMatchShifted.scale);
         if(radialMatch.score < CIRATEFI_RADIAL_THRESHOLD) continue;
 
-        // query.at<rgb>(y, x).g = 64;
+        query.at<rgb>(y, x).g = 192;
 
         auto orthogonalMatch = compareOrthogonals(hand, query, x, y,
             circleMatchShifted.scale, radialMatch.angle);
         if(orthogonalMatch.score < CIRATEFI_ORTHOGONAL_THRESHOLD) continue;
 
-        // query.at<rgb>(y, x).g = 80;
+        query.at<rgb>(y, x).b = 64;
 
         auto parallelMatch = compareParallels(hand, query, x, y,
             circleMatchShifted.scale, radialMatch.angle, orthogonalMatch.yCorrection);
         if(parallelMatch.score < CIRATEFI_PARALLEL_THRESHOLD) continue;
 
-        // query.at<rgb>(y, x).g = 128;
+        query.at<rgb>(y, x).b = 128;
 
         auto allMatch = compareAll(hand, query, x, y,
             circleMatchShifted.scale, radialMatch.angle,
             orthogonalMatch.yCorrection, parallelMatch.xCorrection);
         if(allMatch.score < CIRATEFI_ALL_THRESHOLD) continue;
 
-        if(circleMatch.scale != circleMatchPyramid.scale) {
-          cout << circleMatch.scale << "  vs.   " << circleMatchPyramid.scale << endl;
-        }
+        query.at<rgb>(y, x).b = 255;
+        query.at<rgb>(y, x).g = 255;
 
         cout
           << " C: " << circleMatch.score
@@ -901,9 +898,12 @@ int main(int, char**)
     // namedWindow("Display window", WINDOW_AUTOSIZE);
     // imshow("Display window", reference);
 
-    // namedWindow("Display window 2", WINDOW_AUTOSIZE);
-    // imshow("Display window 2", query);
+    namedWindow("Display window 2", WINDOW_AUTOSIZE);
+    imshow("Display window 2", query);
 
-    // waitKey(0);
+    namedWindow("Display window 3", WINDOW_AUTOSIZE);
+    imshow("Display window 3", queryPyramid[1]);
+
+    waitKey(0);
     return 0;
 }
