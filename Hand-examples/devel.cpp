@@ -10,6 +10,7 @@ struct __attribute__((__packed__)) rgb {
 };
 
 struct ObjectDescription {
+  // Actual object description
   float w, h;
   std::vector<float> circleValuesCoarse;
   float circleValuesCoarseMean, circleValuesCoarseSquared;
@@ -20,9 +21,22 @@ struct ObjectDescription {
   std::vector<float> parallelValues;
   std::vector<float> allValues;
   float allValuesRange;
+
+  // Cached calculations which depend on object geometry
+  struct DeltaCoords {
+    int dx, int dy;
+  };
+
+  struct CircleQuery {
+    float r;
+    std::vector<DeltaCoords> samplePoints;
+  };
+
+  std::vector<CircleQuery> circleQueries;
 };
 
 const bool CIRATEFI_POSITIVE_ONLY = true;
+const int CIRATEFI_INTERPOLATION_SCALE = 12;
 const int CIRATEFI_PYRAMID_LEVELS = 6;
 const int CIRATEFI_CIRCLES_COARSE = 5;
 const int CIRATEFI_CIRCLES = 15;
@@ -37,7 +51,7 @@ const float CIRATEFI_MAGNIFICATION_FACTOR = 3;
 const float CIRATEFI_MINIFICATION_FACTOR = 0.3;
 const float CIRATEFI_CONTRAST_THRESHOLD = 0.3;
 const float CIRATEFI_BRIGHTNESS_THRESHOLD = 75;
-const float CIRATEFI_CIRCLE_THRESHOLD_COARSE = 0.50;
+const float CIRATEFI_CIRCLE_THRESHOLD_COARSE = 0.40;
 const float CIRATEFI_CIRCLE_THRESHOLD_PYRAMID = 0.70;
 const float CIRATEFI_CIRCLE_THRESHOLD = 0.80;
 const float CIRATEFI_CIRCLE_THRESHOLD_SHIFTED = 0.85;
@@ -89,29 +103,57 @@ class Image {
       data = img.clone();
       rows = img.rows;
       cols = img.cols;
-      interpolationCache = Mat(data.rows * 12 + 12, data.cols * 12 + 12, CV_8UC1);
+      interpolationCache = Mat(data.rows * CIRATEFI_INTERPOLATION_SCALE + CIRATEFI_INTERPOLATION_SCALE, data.cols * CIRATEFI_INTERPOLATION_SCALE + CIRATEFI_INTERPOLATION_SCALE, CV_8UC1);
 
-      // for(float y = 0; y < img.rows * 12; ++y) {
-      //   for(float x = 0; x < img.cols * 12; ++x) {
+      for(int y = 0; y < img.rows - 1; ++y) {
+        const int ly = y;
+        const int hy = y + 1;
+
+        for(int x = 0; x < img.cols - 1; ++x) {
+          const int lx = x;
+          const int hx = x + 1;
+
+          const float v00 = img.at<rgb>(ly, lx).r;
+          const float v10 = img.at<rgb>(hy, lx).r;
+          const float v01 = img.at<rgb>(ly, hx).r;
+          const float v11 = img.at<rgb>(hy, hx).r;
+
+          for(int yy = 0; yy < CIRATEFI_INTERPOLATION_SCALE; ++yy) {
+            const float weight_y = yy / static_cast<float>(CIRATEFI_INTERPOLATION_SCALE);
+            const float lcol = weight_y * v00 + (1 - weight_y) * v01;
+            const float hcol = weight_y * v10 + (1 - weight_y) * v11;
+
+            for(int xx = 0; xx < CIRATEFI_INTERPOLATION_SCALE; ++xx) {
+              const float weight_x = xx / static_cast<float>(CIRATEFI_INTERPOLATION_SCALE);
+
+              interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE + yy, x * CIRATEFI_INTERPOLATION_SCALE + xx) =
+                weight_x * hcol + (1 - weight_x) * lcol;
+            }
+          }
+        }
+      }
+
+      // for(float y = 0; y < img.rows * CIRATEFI_INTERPOLATION_SCALE; ++y) {
+      //   for(float x = 0; x < img.cols * CIRATEFI_INTERPOLATION_SCALE; ++x) {
       //     interpolationCache.at<unsigned char>(y, x) =
-      //       interpolate(img, x / 12, y / 12, 0);
+      //       interpolate(img, x / CIRATEFI_INTERPOLATION_SCALE, y / CIRATEFI_INTERPOLATION_SCALE, 0);
       //   }
       // }
     }
 };
 
-float interpolate(Image &img, float x, float y, unsigned char) {
-  unsigned char result = img.interpolationCache.at<unsigned char>(y * 12, x * 12); 
-  if(result) return result;
-
-  result = interpolate(img.data, (int)(x * 12) / 12.0, (int)(y * 12) / 12.0, 0);
-  img.interpolationCache.at<unsigned char>(y * 12, x * 12) = result? result: 1;
-  return result;
-}
-
 // float interpolate(Image &img, float x, float y, unsigned char) {
-//   return img.interpolationCache.at<unsigned char>(y * 12, x * 12); 
+//   unsigned char result = img.interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE, x * CIRATEFI_INTERPOLATION_SCALE); 
+//   if(result) return result;
+// 
+//   result = interpolate(img.data, (int)(x * CIRATEFI_INTERPOLATION_SCALE) / static_cast<float>(CIRATEFI_INTERPOLATION_SCALE), (int)(y * CIRATEFI_INTERPOLATION_SCALE) / static_cast<float>(CIRATEFI_INTERPOLATION_SCALE), 0);
+//   img.interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE, x * CIRATEFI_INTERPOLATION_SCALE) = result? result: 1;
+//   return result;
 // }
+
+float interpolate(Image &img, float x, float y, unsigned char) {
+  return img.interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE, x * CIRATEFI_INTERPOLATION_SCALE); 
+}
 
 template<typename I> typename I::value_type mean(
     const I &is, const I &ie) {
@@ -261,7 +303,6 @@ ObjectDescription measureObject(Image &img, int sx, int sy, int ex, int ey) {
         sum += interpolate(img, cx + ri * sinf(alpha), cy + ri * cosf(alpha), 255);
         count++;
       }
-      // cout << "c (" << ri << "," << count << "): " << sum / count << endl;
       result.circleValuesCoarse.push_back(sum / count);
 
       ri /= CIRATEFI_CIRCLE_DIVISOR_COARSE;
@@ -287,7 +328,6 @@ ObjectDescription measureObject(Image &img, int sx, int sy, int ex, int ey) {
       sum += interpolate(img, cx + ri * sinf(alpha), cy + ri * cosf(alpha), 255);
       count++;
     }
-    // cout << "c (" << ri << "," << count << "): " << sum / count << endl;
     result.circleValues.push_back(sum / count);
 
     ri /= CIRATEFI_CIRCLE_DIVISOR;
@@ -913,6 +953,21 @@ AllMatchQuality compareAll(const ObjectDescription &obj,
   return result;
 }
 
+void drawMatch(const ObjectDescription &obj,
+    Mat &img, int x, int y, const AllMatchQuality &match) {
+  int sx = x - (obj.w / 2.0) * match.wx - (obj.h / 2.0) * match.hx;
+  int sy = y - (obj.w / 2.0) * match.wy - (obj.h / 2.0) * match.hy;
+
+  for(int ly = 0; ly < obj.h; ++ly) {
+    for(int lx = 0; lx < obj.w; ++lx) {
+      float ix = sx + lx * match.wx + ly * match.hx;
+      float iy = sy + lx * match.wy + ly * match.hy;
+
+      img.at<rgb>(iy, ix).g = 128;
+    }
+  }
+}
+
 std::vector<Image> buildImagePyramid(Image img) {
   std::vector<Image> ret;
   ret.push_back(img);
@@ -1006,6 +1061,7 @@ int main(int, char**)
         static_cast<const unsigned char &(*)(const unsigned char &, const unsigned char&)>(std::min));
     auto maxImage = buildExtremumImage(queryPyramid[2].data, 16,
         static_cast<const unsigned char &(*)(const unsigned char &, const unsigned char&)>(std::max));
+    Mat hopeless(query.rows, query.cols, CV_8UC1);
 
     for(int y = 0; y < query.rows; ++y) {
     // for(int y = sy; y < ey; ++y) {
@@ -1014,6 +1070,8 @@ int main(int, char**)
       cout << y << endl;
       // for(int x = 300; x < 400; ++x) {
       for(int x = 0; x < query.cols; ++x) {
+        if(hopeless.at<unsigned char>(y, x)) continue;
+
         float range = maxImage.at<rgb>(y / 4, x / 4).r - minImage.at<rgb>(y / 4, x / 4).r;
         if(range * range < hand.allValuesRange) continue;
 
@@ -1023,6 +1081,9 @@ int main(int, char**)
         auto circleMatchCoarse = compareCirclesPyramidCoarse(hand, queryPyramid, x, y, 5);
         if(circleMatchCoarse.score < 0.1) {
           x++;
+          hopeless.at<unsigned char>(y + 1, x - 1) = 1;
+          hopeless.at<unsigned char>(y + 1, x) = 1;
+          hopeless.at<unsigned char>(y + 1, x + 1) = 1;
           continue;
         }
 
@@ -1041,15 +1102,15 @@ int main(int, char**)
 
         //query.at<rgb>(y, x).g = 80;
 
+        auto radialMatch = compareRadials(hand, queryImage, x, y, circleMatch.scale);
+        if(radialMatch.score < CIRATEFI_RADIAL_THRESHOLD) continue;
+
+        //query.at<rgb>(y, x).g = 192;
+
         auto circleMatchShifted = compareCirclesShifted(hand, queryImage, x, y, circleMatch.scale);
         if(circleMatchShifted.score < CIRATEFI_CIRCLE_THRESHOLD_SHIFTED) continue;
 
         //query.at<rgb>(y, x).g = 128;
-
-        auto radialMatch = compareRadials(hand, queryImage, x, y, circleMatchShifted.scale);
-        if(radialMatch.score < CIRATEFI_RADIAL_THRESHOLD) continue;
-
-        //query.at<rgb>(y, x).g = 192;
 
         auto orthogonalMatch = compareOrthogonals(hand, queryImage, x, y,
             circleMatchShifted.scale, radialMatch.angle);
@@ -1095,15 +1156,15 @@ int main(int, char**)
           // << " P: " << circleMatchPyramid2.score
           << endl;
 
-        // query.at<rgb>(y, x).g = 255;
+        drawMatch(hand, query, x, y, allMatch);
       }
     }
 
     // namedWindow("Display window", WINDOW_AUTOSIZE);
     // imshow("Display window", reference);
 
-    namedWindow("Display window 2", WINDOW_AUTOSIZE);
-    imshow("Display window 2", query);
+    // namedWindow("Display window 2", WINDOW_AUTOSIZE);
+    // imshow("Display window 2", query);
 
     // namedWindow("Display window 3", WINDOW_AUTOSIZE);
     // imshow("Display window 3", queryPyramid[1].data);
@@ -1114,6 +1175,6 @@ int main(int, char**)
     // namedWindow("Display window max", WINDOW_AUTOSIZE);
     // imshow("Display window max", maxImage);
 
-    waitKey(0);
+    // waitKey(0);
     return 0;
 }
