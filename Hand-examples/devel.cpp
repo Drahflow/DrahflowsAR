@@ -25,6 +25,7 @@ struct ObjectDescription {
   // Cached calculations which depend on object geometry
   struct DeltaCoords {
     int dy, dx;
+    ptrdiff_t d;
   };
 
   struct CircleQuery {
@@ -35,6 +36,9 @@ struct ObjectDescription {
 
   std::vector<CircleQuery> coarseCircleQueries;
   float coarseCircleRMax;
+
+  std::vector<CircleQuery> pyramidCircleQueries;
+  float pyramidCircleRMax;
 
   std::vector<CircleQuery> circleQueries;
   float circleRMax;
@@ -288,7 +292,7 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConst(
   return result;
 }
 
-void precomputeCoarseCircleQueries(ObjectDescription &obj, float maxR) {
+void precomputeCoarseCircleQueries(Image &img, ObjectDescription &obj, float maxR) {
   float w = obj.w;
   float h = obj.h;
 
@@ -316,6 +320,9 @@ void precomputeCoarseCircleQueries(ObjectDescription &obj, float maxR) {
     for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
       query.samplePoints.push_back(ObjectDescription::DeltaCoords{
         static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)),
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)),
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)) *
+        CIRATEFI_INTERPOLATION_SCALE * (1 + (img.data.cols >> pyrLvl)) +
         static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha))
       });
     }
@@ -324,7 +331,7 @@ void precomputeCoarseCircleQueries(ObjectDescription &obj, float maxR) {
   }
 }
 
-void precomputeCircleQueries(ObjectDescription &obj, float maxR) {
+void precomputePyramidCircleQueries(Image &img, ObjectDescription &obj, float maxR) {
   float w = obj.w;
   float h = obj.h;
 
@@ -334,7 +341,7 @@ void precomputeCircleQueries(ObjectDescription &obj, float maxR) {
 
   float ri = r;
   for(; ri < rs; ri *= CIRATEFI_CIRCLE_DIVISOR);
-  obj.circleRMax = ri;
+  obj.pyramidCircleRMax = ri;
   for(; ri > re; ri /= CIRATEFI_CIRCLE_DIVISOR) {
     ObjectDescription::CircleQuery query;
     query.r = ri;
@@ -352,6 +359,42 @@ void precomputeCircleQueries(ObjectDescription &obj, float maxR) {
     for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
       query.samplePoints.push_back(ObjectDescription::DeltaCoords{
         static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)),
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)),
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)) *
+        CIRATEFI_INTERPOLATION_SCALE * (1 + (img.data.cols >> pyrLvl)) +
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha))
+      });
+    }
+
+    obj.pyramidCircleQueries.push_back(query);
+  }
+}
+
+void precomputeCircleQueries(Image &img, ObjectDescription &obj) {
+  float w = obj.w;
+  float h = obj.h;
+
+  float r = (w < h? w: h) / 2;
+  float rs = r * CIRATEFI_MAGNIFICATION_FACTOR;
+  float re = r * CIRATEFI_MINIFICATION_FACTOR / pow(CIRATEFI_CIRCLE_DIVISOR, CIRATEFI_CIRCLES);
+
+  float ri = r;
+  for(; ri < rs; ri *= CIRATEFI_CIRCLE_DIVISOR);
+  obj.circleRMax = ri;
+  for(; ri > re; ri /= CIRATEFI_CIRCLE_DIVISOR) {
+    ObjectDescription::CircleQuery query;
+    query.r = ri;
+
+    float rj = ri;
+    query.pyrLvl = 0;
+
+    float len = 2 * M_PI * rj;
+    for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
+      query.samplePoints.push_back(ObjectDescription::DeltaCoords{
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)),
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)),
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)) *
+        CIRATEFI_INTERPOLATION_SCALE * (1 + img.data.cols) +
         static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha))
       });
     }
@@ -483,10 +526,20 @@ ObjectDescription measureObject(Image &img, int sx, int sy, int ex, int ey) {
       result.allValues.begin(), result.allValues.end(), allMean
   ) / result.allValues.size();
 
-  precomputeCoarseCircleQueries(result, 5);
-  precomputeCircleQueries(result, 20);
+  precomputeCoarseCircleQueries(img, result, 5);
+  precomputePyramidCircleQueries(img, result, 20);
+  precomputeCircleQueries(img, result);
 
   return result;
+}
+
+unsigned int querySum(unsigned char *center, const ObjectDescription::DeltaCoords *deltas, int n) {
+  unsigned int sum = 0;
+  for(const ObjectDescription::DeltaCoords *e = deltas + n; deltas != e; ++deltas) {
+    sum += *(center + deltas->d);
+  }
+
+  return sum;
 }
 
 struct CircleMatchQuality {
@@ -506,17 +559,15 @@ CircleMatchQuality compareCirclesPyramidCoarse(const ObjectDescription &obj,
     if(x - ri < 0 || y - ri < 0 || x + ri >= pyr[0].cols || y + ri >= pyr[0].rows) {
       measured.push_back(-1e6);
     } else {
-      int cx = (x >> query.pyrLvl) * CIRATEFI_INTERPOLATION_SCALE;
-      int cy = (y >> query.pyrLvl) * CIRATEFI_INTERPOLATION_SCALE;
+      int cx = (x * CIRATEFI_INTERPOLATION_SCALE >> query.pyrLvl);
+      int cy = (y * CIRATEFI_INTERPOLATION_SCALE >> query.pyrLvl);
       Mat &data = pyr[query.pyrLvl].interpolationCache;
+      const int center = cy * data.cols + cx;
 
-      unsigned int sum = 0;
-      for(const auto &offset: query.samplePoints) {
-        sum += data.at<unsigned char>(
-            cy + offset.dy,
-            cx + offset.dx
-        );
-      }
+      unsigned int sum = querySum(
+          &data.at<unsigned char>(center),
+          query.samplePoints.data(),
+          query.samplePoints.size());
 
       measured.push_back(static_cast<float>(sum) / query.samplePoints.size());
     }
@@ -553,23 +604,21 @@ CircleMatchQuality compareCirclesPyramid(const ObjectDescription &obj,
   CircleMatchQuality result;
   std::vector<float> measured;
 
-  for(const auto &query: obj.circleQueries) {
+  for(const auto &query: obj.pyramidCircleQueries) {
     float ri = query.r;
 
     if(x - ri < 0 || y - ri < 0 || x + ri >= pyr[0].cols || y + ri >= pyr[0].rows) {
       measured.push_back(-1e6);
     } else {
-      int cx = x >> query.pyrLvl;
-      int cy = y >> query.pyrLvl;
-      Image &img = pyr[query.pyrLvl];
+      int cx = (x * CIRATEFI_INTERPOLATION_SCALE >> query.pyrLvl);
+      int cy = (y * CIRATEFI_INTERPOLATION_SCALE >> query.pyrLvl);
+      Mat &data = pyr[query.pyrLvl].interpolationCache;
+      const int center = cy * data.cols + cx;
 
-      unsigned int sum = 0;
-      for(const auto &offset: query.samplePoints) {
-        sum += img.interpolationCache.at<unsigned char>(
-            cy * CIRATEFI_INTERPOLATION_SCALE + offset.dy,
-            cx * CIRATEFI_INTERPOLATION_SCALE + offset.dx
-        );
-      }
+      unsigned int sum = querySum(
+          &data.at<unsigned char>(center),
+          query.samplePoints.data(),
+          query.samplePoints.size());
 
       measured.push_back(static_cast<float>(sum) / query.samplePoints.size());
     }
@@ -597,7 +646,7 @@ CircleMatchQuality compareCirclesPyramid(const ObjectDescription &obj,
   result.gamma = bestCorrelation.gamma;
 
   const float r = (obj.w < obj.h? obj.w: obj.h) / 2;
-  result.scale = obj.circleRMax / (r * pow(CIRATEFI_CIRCLE_DIVISOR, bestIndex));
+  result.scale = obj.pyramidCircleRMax / (r * pow(CIRATEFI_CIRCLE_DIVISOR, bestIndex));
   return result;
 }
 
