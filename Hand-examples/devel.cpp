@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <string>
+#include <array>
 
 using namespace cv;
 using namespace std;
@@ -17,6 +18,7 @@ struct ObjectDescription {
   std::vector<float> circleValues;
   float circleValuesMean, circleValuesSquared;
   std::vector<float> radialValues;
+  float radialValuesMean, radialValuesSquared;
   std::vector<float> orthogonalValues;
   std::vector<float> parallelValues;
   std::vector<float> allValues;
@@ -24,7 +26,6 @@ struct ObjectDescription {
 
   // Cached calculations which depend on object geometry
   struct DeltaCoords {
-    int dy, dx;
     ptrdiff_t d;
   };
 
@@ -60,12 +61,12 @@ const float CIRATEFI_MAGNIFICATION_FACTOR = 3;
 const float CIRATEFI_MINIFICATION_FACTOR = 0.3;
 const float CIRATEFI_CONTRAST_THRESHOLD = 0.3;
 const float CIRATEFI_BRIGHTNESS_THRESHOLD = 75;
-const float CIRATEFI_CIRCLE_THRESHOLD_COARSE = 0.40;
+const float CIRATEFI_CIRCLE_THRESHOLD_COARSE = 0.65;
 const float CIRATEFI_CIRCLE_THRESHOLD_PYRAMID = 0.70;
-const float CIRATEFI_CIRCLE_THRESHOLD = 0.80;
-const float CIRATEFI_CIRCLE_THRESHOLD_SHIFTED = 0.85;
-const float CIRATEFI_RADIAL_THRESHOLD = 0.65;
-const float CIRATEFI_ORTHOGONAL_THRESHOLD = 0.70;
+const float CIRATEFI_CIRCLE_THRESHOLD = 0.75;
+const float CIRATEFI_CIRCLE_THRESHOLD_SHIFTED = 0.80;
+const float CIRATEFI_RADIAL_THRESHOLD = 0.85;
+const float CIRATEFI_ORTHOGONAL_THRESHOLD = 0.60;
 const float CIRATEFI_PARALLEL_THRESHOLD = 0.75;
 const float CIRATEFI_ALL_EARLY_THRESHOLD = 0.60;
 const float CIRATEFI_ALL_THRESHOLD = 0.70;
@@ -94,8 +95,8 @@ float interpolate(Mat &img, float x, float y, unsigned char) {
   float v01 = img.at<rgb>(ly, hx).r;
   float v11 = img.at<rgb>(hy, hx).r;
 
-  float lcol = weight_y * v00 + (1 - weight_y) * v01;
-  float hcol = weight_y * v10 + (1 - weight_y) * v11;
+  float lcol = weight_y * v10 + (1 - weight_y) * v00;
+  float hcol = weight_y * v11 + (1 - weight_y) * v01;
 
   return weight_x * hcol + (1 - weight_x) * lcol;
 }
@@ -129,14 +130,14 @@ class Image {
 
           for(int yy = 0; yy < CIRATEFI_INTERPOLATION_SCALE; ++yy) {
             const float weight_y = yy / static_cast<float>(CIRATEFI_INTERPOLATION_SCALE);
-            const float lcol = weight_y * v00 + (1 - weight_y) * v01;
-            const float hcol = weight_y * v10 + (1 - weight_y) * v11;
+            const float lcol = weight_y * v10 + (1 - weight_y) * v00;
+            const float hcol = weight_y * v11 + (1 - weight_y) * v01;
+            unsigned char *subrow = &interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE + yy, x * CIRATEFI_INTERPOLATION_SCALE);
+            const float dx = (hcol - lcol) / CIRATEFI_INTERPOLATION_SCALE;
 
-            for(int xx = 0; xx < CIRATEFI_INTERPOLATION_SCALE; ++xx) {
-              const float weight_x = xx / static_cast<float>(CIRATEFI_INTERPOLATION_SCALE);
-
-              interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE + yy, x * CIRATEFI_INTERPOLATION_SCALE + xx) =
-                weight_x * hcol + (1 - weight_x) * lcol;
+            float v = lcol;
+            for(int xx = 0; xx < CIRATEFI_INTERPOLATION_SCALE; ++xx, ++subrow, v += dx) {
+              *subrow = v;
             }
           }
         }
@@ -144,8 +145,10 @@ class Image {
 
       // for(float y = 0; y < img.rows * CIRATEFI_INTERPOLATION_SCALE; ++y) {
       //   for(float x = 0; x < img.cols * CIRATEFI_INTERPOLATION_SCALE; ++x) {
-      //     interpolationCache.at<unsigned char>(y, x) =
-      //       interpolate(img, x / CIRATEFI_INTERPOLATION_SCALE, y / CIRATEFI_INTERPOLATION_SCALE, 0);
+      //     unsigned char expected = interpolate(img, x / CIRATEFI_INTERPOLATION_SCALE, y / CIRATEFI_INTERPOLATION_SCALE, 0);
+      //     if(fabs(interpolationCache.at<unsigned char>(y, x) - expected) > 1) {
+      //       cout << x << "," << y << endl;
+      //     }
       //   }
       // }
     }
@@ -164,9 +167,9 @@ float interpolate(Image &img, float x, float y, unsigned char) {
   return img.interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE, x * CIRATEFI_INTERPOLATION_SCALE); 
 }
 
-template<typename I> typename I::value_type mean(
+template<typename I> typename std::iterator_traits<I>::value_type mean(
     const I &is, const I &ie) {
-  typename I::value_type sum = 0;
+  typename iterator_traits<I>::value_type sum = 0;
   int count = 0;
 
   for(auto i = is; i != ie; ++i) {
@@ -178,9 +181,9 @@ template<typename I> typename I::value_type mean(
 }
 
 template<typename I, typename IT, typename J, typename JT>
-typename I::value_type meanDotProduct(
+typename std::iterator_traits<I>::value_type meanDotProduct(
     const I &is, const I &ie, const IT &im, const J &js, const J &je, const JT &jm) {
-  typename I::value_type p = 0;
+  typename std::iterator_traits<I>::value_type p = 0;
 
   auto i = is;
   auto j = js;
@@ -221,7 +224,7 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficient(
   struct CorrelationCoefficient<typename I::value_type> result;
 
   const typename I::value_type xm = mean(is, ie);
-  const typename J::value_type ym = mean(js, je);
+  const typename std::iterator_traits<J>::value_type ym = mean(js, je);
 
   const typename I::value_type xx = meanDotProduct(is, ie, xm, is, ie, xm);
   const typename I::value_type xy = meanDotProduct(is, ie, xm, js, je, ym);
@@ -247,7 +250,7 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficient(
     return result;
   }
 
-  const typename J::value_type yy = meanDotProduct(js, je, ym, js, je, ym);
+  const typename std::iterator_traits<J>::value_type yy = meanDotProduct(js, je, ym, js, je, ym);
   result.corr = xy / sqrt(xx * yy);
 
   return result;
@@ -259,8 +262,8 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConst(
     const J &js, const J &je) {
   struct CorrelationCoefficient<typename I::value_type> result;
 
-  const typename J::value_type xm = im;
-  const typename J::value_type ym = mean(js, je);
+  const typename iterator_traits<I>::value_type xm = im;
+  const typename iterator_traits<J>::value_type ym = mean(js, je);
 
   const typename I::value_type xx = i2;
   const typename I::value_type xy = meanDotProductLeftConst(is, ie, js, je, ym);
@@ -286,7 +289,7 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConst(
     return result;
   }
 
-  const typename J::value_type yy = meanDotProduct(js, je, ym, js, je, ym);
+  const typename iterator_traits<J>::value_type yy = meanDotProduct(js, je, ym, js, je, ym);
   result.corr = xy / sqrt(xx * yy);
 
   return result;
@@ -319,11 +322,9 @@ void precomputeCoarseCircleQueries(Image &img, ObjectDescription &obj, float max
     float len = 2 * M_PI * rj;
     for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
       query.samplePoints.push_back(ObjectDescription::DeltaCoords{
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)),
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)),
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)) *
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)) *
         CIRATEFI_INTERPOLATION_SCALE * (1 + (img.data.cols >> pyrLvl)) +
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha))
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha))
       });
     }
 
@@ -358,11 +359,9 @@ void precomputePyramidCircleQueries(Image &img, ObjectDescription &obj, float ma
     float len = 2 * M_PI * rj;
     for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
       query.samplePoints.push_back(ObjectDescription::DeltaCoords{
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)),
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)),
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)) *
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)) *
         CIRATEFI_INTERPOLATION_SCALE * (1 + (img.data.cols >> pyrLvl)) +
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha))
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha))
       });
     }
 
@@ -391,11 +390,9 @@ void precomputeCircleQueries(Image &img, ObjectDescription &obj) {
     float len = 2 * M_PI * rj;
     for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
       query.samplePoints.push_back(ObjectDescription::DeltaCoords{
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)),
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)),
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha)) *
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha)) *
         CIRATEFI_INTERPOLATION_SCALE * (1 + img.data.cols) +
-        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * cosf(alpha))
+        static_cast<int>(CIRATEFI_INTERPOLATION_SCALE * rj * sinf(alpha))
       });
     }
 
@@ -476,6 +473,15 @@ ObjectDescription measureObject(Image &img, int sx, int sy, int ex, int ey) {
     result.radialValues.push_back(sum / count);
   }
 
+  result.radialValuesMean = mean(result.radialValues.begin(), result.radialValues.end());
+  for(auto &v: result.radialValues) {
+    v -= result.radialValuesMean;
+  }
+  result.radialValuesSquared = meanDotProduct(
+      result.radialValues.begin(), result.radialValues.end(), 0.0,
+      result.radialValues.begin(), result.radialValues.end(), 0.0
+  );
+
   for(int n = 0; n < CIRATEFI_ORTHOGONALS; ++n) {
     float y = sy + h * 1.0 * n / (CIRATEFI_ORTHOGONALS - 1);
 
@@ -545,6 +551,7 @@ unsigned int querySum(unsigned char *center, const ObjectDescription::DeltaCoord
 struct CircleMatchQuality {
   float score;
   float scale;
+  int startQuery;
   float beta, gamma;
 };
 
@@ -644,6 +651,7 @@ CircleMatchQuality compareCirclesPyramid(const ObjectDescription &obj,
   result.score = fabs(bestCorrelation.corr);
   result.beta = bestCorrelation.beta;
   result.gamma = bestCorrelation.gamma;
+  result.startQuery = bestIndex;
 
   const float r = (obj.w < obj.h? obj.w: obj.h) / 2;
   result.scale = obj.pyramidCircleRMax / (r * pow(CIRATEFI_CIRCLE_DIVISOR, bestIndex));
@@ -651,53 +659,41 @@ CircleMatchQuality compareCirclesPyramid(const ObjectDescription &obj,
 }
 
 CircleMatchQuality compareCircles(const ObjectDescription &obj,
-    Image &img, int x, int y, float scale) {
+    Image &img, int x, int y, int startQuery, float scale) {
   CircleMatchQuality result;
-  std::vector<float> measured;
+  std::array<float, CIRATEFI_CIRCLES> measured;
 
-  float w = obj.w;
-  float h = obj.h;
-  int cx = x;
-  int cy = y;
-  float r = (w < h? w: h) / 2;
-  // float rs = r * CIRATEFI_MAGNIFICATION_FACTOR;
-  // float re = r * CIRATEFI_MINIFICATION_FACTOR / pow(CIRATEFI_CIRCLE_DIVISOR, CIRATEFI_CIRCLES);
+  auto query = obj.circleQueries.begin() + startQuery;
+  for(int i = 0; i < CIRATEFI_CIRCLES; ++i, ++query) {
+    float ri = query->r;
 
-  float ri = r * scale;
-  // for(; ri < rs; ri *= CIRATEFI_CIRCLE_DIVISOR);
-  // const float rMax = ri;
-  for(int n = 0; n < CIRATEFI_CIRCLES; ++n) {
     if(x - ri < 0 || y - ri < 0 || x + ri >= img.cols || y + ri >= img.rows) {
-      measured.push_back(-1e6);
+      measured[i] = -1e6;
     } else {
-      float len = 2 * M_PI * ri;
-      float sum = 0;
-      float count = 0;
+      int cx = x * CIRATEFI_INTERPOLATION_SCALE;
+      int cy = y * CIRATEFI_INTERPOLATION_SCALE;
+      Mat &data = img.interpolationCache;
+      const int center = cy * data.cols + cx;
 
-      for(float alpha = 0; alpha < 2 * M_PI; alpha += 2 * M_PI / (len * CIRATEFI_CIRCLE_DENSITY)) {
-        sum += interpolate(img, cx + ri * sinf(alpha), cy + ri * cosf(alpha), 64);
-        count++;
-      }
+      unsigned int sum = querySum(
+          &data.at<unsigned char>(center),
+          query->samplePoints.data(),
+          query->samplePoints.size());
 
-      // cout << "m (" << ri << "," << count << "): " << sum / count << endl;
-      measured.push_back(sum / count);
+      measured[i] = static_cast<float>(sum) / query->samplePoints.size();
     }
-
-    ri /= CIRATEFI_CIRCLE_DIVISOR;
   }
 
   float bestCorrelation = 0.0;
-  for(size_t i = 0; i < measured.size() - CIRATEFI_CIRCLES + 1; ++i) {
-    float corrCoeff = correlationCoefficient(
-      obj.circleValues.begin(), obj.circleValues.end(),
-      measured.begin() + i, measured.begin() + i + CIRATEFI_CIRCLES).corr;
-    if(fabs(corrCoeff) > bestCorrelation) {
-      bestCorrelation = fabs(corrCoeff);
-    }
+  float corrCoeff = correlationCoefficientLeftConst(
+    obj.circleValues.begin(), obj.circleValues.end(),
+    obj.circleValuesMean, obj.circleValuesSquared,
+    measured.begin(), measured.end()).corr;
+  if(fabs(corrCoeff) > bestCorrelation) {
+    bestCorrelation = fabs(corrCoeff);
   }
 
   result.score = bestCorrelation;
-  // result.scale = rMax / (r * pow(CIRATEFI_CIRCLE_DIVISOR, bestIndex));
   result.scale = scale;
   return result;
 }
@@ -736,8 +732,9 @@ CircleMatchQuality compareCirclesShifted(const ObjectDescription &obj,
       ri /= CIRATEFI_CIRCLE_DIVISOR;
     }
 
-    float corrCoeff = correlationCoefficient(
+    float corrCoeff = correlationCoefficientLeftConst(
       obj.circleValues.begin(), obj.circleValues.end(),
+      obj.circleValuesMean, obj.circleValuesSquared,
       measured.begin(), measured.begin() + CIRATEFI_CIRCLES).corr;
     if(fabs(corrCoeff) > bestCorrelation) {
       bestCorrelation = fabs(corrCoeff);
@@ -788,8 +785,9 @@ RadialMatchQuality compareRadials(const ObjectDescription &obj,
   }
 
   for(size_t i = 0; i < measured.size() - CIRATEFI_RADIALS; ++i) {
-    float corrCoeff = correlationCoefficient(
+    float corrCoeff = correlationCoefficientLeftConst(
       obj.radialValues.begin(), obj.radialValues.end(),
+      obj.radialValuesMean, obj.radialValuesSquared,
       measured.begin() + i, measured.begin() + i + CIRATEFI_RADIALS).corr;
     if(fabs(corrCoeff) > bestCorrelation) {
       bestCorrelation = fabs(corrCoeff);
@@ -1133,7 +1131,8 @@ int main(int, char**)
 
         //query.at<rgb>(y, x).g = 64;
 
-        auto circleMatch = compareCircles(hand, queryImage, x, y, circleMatchPyramid.scale);
+        auto circleMatch = compareCircles(hand, queryImage, x, y,
+            circleMatchPyramid.startQuery, circleMatchPyramid.scale);
         // cout << circleMatch.score << endl;
         if(circleMatch.score < CIRATEFI_CIRCLE_THRESHOLD) continue;
 
@@ -1143,7 +1142,6 @@ int main(int, char**)
         if(radialMatch.score < CIRATEFI_RADIAL_THRESHOLD) continue;
 
         //query.at<rgb>(y, x).g = 192;
-
         auto circleMatchShifted = compareCirclesShifted(hand, queryImage, x, y, circleMatch.scale);
         if(circleMatchShifted.score < CIRATEFI_CIRCLE_THRESHOLD_SHIFTED) continue;
 
@@ -1152,6 +1150,8 @@ int main(int, char**)
         auto orthogonalMatch = compareOrthogonals(hand, queryImage, x, y,
             circleMatchShifted.scale, radialMatch.angle);
         if(orthogonalMatch.score < CIRATEFI_ORTHOGONAL_THRESHOLD) continue;
+
+        query.at<rgb>(y, x).b = 128;
 
         //query.at<rgb>(y, x).b = 64;
 
