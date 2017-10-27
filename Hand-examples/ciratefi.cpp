@@ -1582,6 +1582,7 @@ int main(int, char**)
     namedWindow("Display window 2", WINDOW_AUTOSIZE);
 
     Mat reference = imread("svo.0120.png", IMREAD_COLOR );
+    GaussianBlur(reference, reference, cv::Size{0,0}, 1, 1);
     if(reference.empty()) {
         cout <<  "Could not load reference image" << endl ;
         return -1;
@@ -1607,6 +1608,7 @@ int main(int, char**)
       filename << "svo." << setw(4) << setfill('0') << i << ".png";
 
       Mat query = imread(filename.str(), IMREAD_COLOR );
+      GaussianBlur(query, query, cv::Size{0,0}, 1, 1);
       // Mat query = imread("svo.0120.png", IMREAD_COLOR );
       if(query.empty()) {
           cout <<  "Could not load " << filename.str() << endl ;
