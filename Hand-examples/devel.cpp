@@ -76,40 +76,9 @@ float interpolate(Mat &img, float x, float y, unsigned char) {
   return img.at<rgb>(y + 0.5, x + 0.5).r;
 }
 
-// float interpolate(Mat &img, float x, float y, unsigned char draw) {
-//   img.at<rgb>(y, x).b = std::max(img.at<rgb>(y, x).b, draw);
-// 
-//   int lx = x;
-//   int ly = y;
-//   if(lx < 0 || ly < 0) {
-//     return -1e6;
-//   }
-// 
-//   int hx = lx + 1;
-//   int hy = ly + 1;
-//   if(hx >= img.cols || hy >= img.rows) {
-//     return -1e6;
-//   }
-// 
-//   float weight_x = x - lx;
-//   float weight_y = y - ly;
-// 
-//   float v00 = img.at<rgb>(ly, lx).r;
-//   float v10 = img.at<rgb>(hy, lx).r;
-//   float v01 = img.at<rgb>(ly, hx).r;
-//   float v11 = img.at<rgb>(hy, hx).r;
-// 
-//   float lcol = weight_y * v10 + (1 - weight_y) * v00;
-//   float hcol = weight_y * v11 + (1 - weight_y) * v01;
-// 
-//   float result = weight_x * hcol + (1 - weight_x) * lcol;
-//   return result;
-// }
-
 class Image {
   public:
     Mat data;
-    // Mat interpolationCache;
     int rows;
     int cols;
 
@@ -118,62 +87,8 @@ class Image {
       data = img;
       rows = img.rows;
       cols = img.cols;
-      // interpolationCache = Mat(data.rows * CIRATEFI_INTERPOLATION_SCALE + CIRATEFI_INTERPOLATION_SCALE, data.cols * CIRATEFI_INTERPOLATION_SCALE + CIRATEFI_INTERPOLATION_SCALE, CV_8UC1, 0.0);
-
-      // for(int y = 0; y < img.rows - 1; ++y) {
-      //   const int ly = y;
-      //   const int hy = y + 1;
-
-      //   for(int x = 0; x < img.cols - 1; ++x) {
-      //     const int lx = x;
-      //     const int hx = x + 1;
-
-      //     const float v00 = img.at<rgb>(ly, lx).r;
-      //     const float v10 = img.at<rgb>(hy, lx).r;
-      //     const float v01 = img.at<rgb>(ly, hx).r;
-      //     const float v11 = img.at<rgb>(hy, hx).r;
-
-      //     unsigned char *block = &interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE, x * CIRATEFI_INTERPOLATION_SCALE);
-
-      //     const float dyl = (v10 - v00) / CIRATEFI_INTERPOLATION_SCALE;
-      //     const float dyh = (v11 - v01) / CIRATEFI_INTERPOLATION_SCALE;
-
-      //     float lcol = v00;
-      //     float hcol = v01;
-      //     for(int yy = 0; yy < CIRATEFI_INTERPOLATION_SCALE; ++yy) {
-      //       const float dx = (hcol - lcol) / CIRATEFI_INTERPOLATION_SCALE;
-
-      //       float v = lcol;
-      //       for(unsigned char *const end = block + CIRATEFI_INTERPOLATION_SCALE;
-      //           block < end; ++block, v += dx) {
-      //         *block = v;
-      //       }
-
-      //       lcol += dyl;
-      //       hcol += dyh;
-      //       block += interpolationCache.cols - CIRATEFI_INTERPOLATION_SCALE;
-      //     }
-      //   }
-      // }
     }
 };
-
-// float interpolate(Image &img, float x, float y, unsigned char) {
-//   unsigned char result = img.interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE, x * CIRATEFI_INTERPOLATION_SCALE); 
-//   if(result) return result;
-// 
-//   result = interpolate(img.data, (int)(x * CIRATEFI_INTERPOLATION_SCALE) / static_cast<float>(CIRATEFI_INTERPOLATION_SCALE), (int)(y * CIRATEFI_INTERPOLATION_SCALE) / static_cast<float>(CIRATEFI_INTERPOLATION_SCALE), 0);
-//   img.interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE, x * CIRATEFI_INTERPOLATION_SCALE) = result? result: 1;
-//   return result;
-// }
-
-// float interpolate(Image &img, float x, float y, unsigned char) {
-//   if(x < 0 || y < 0 || x >= img.cols || y >= img.rows) {
-//     return -1e6;
-//   }
-// 
-//   return img.interpolationCache.at<unsigned char>(y * CIRATEFI_INTERPOLATION_SCALE, x * CIRATEFI_INTERPOLATION_SCALE); 
-// }
 
 template<typename I> typename std::iterator_traits<I>::value_type mean(
     const I &is, const I &ie) {
@@ -479,22 +394,6 @@ ObjectDescription measureObject(Image &img, int sx, int sy, int ex, int ey) {
 
   return result;
 }
-
-// unsigned int querySum(unsigned char *center, const ObjectDescription::DeltaCoords *deltas, int n) {
-//   unsigned int sum_0 = 0;
-//   unsigned int sum_1 = 0;
-//   for(const ObjectDescription::DeltaCoords *e = deltas + (n >> 1 << 1); deltas != e; deltas += 2) {
-//     sum_0 += *(center + deltas[0].d);
-//     sum_1 += *(center + deltas[1].d);
-//   }
-//   unsigned int sum = sum_0 + sum_1;
-// 
-//   if(n & 1) {
-//     sum += *(center + deltas[0].d);
-//   }
-// 
-//   return sum;
-// }
 
 struct FingerMatchQuality {
   bool windowed;
