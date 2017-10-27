@@ -15,6 +15,10 @@ struct __attribute__((__packed__)) rgb {
 struct ObjectDescription {
   float w, h;
   std::vector<float> fingerSignature;
+  float fingerSignatureMean, fingerSignatureSquare;
+
+  std::vector<float> crossSignature;
+  float crossSignatureMean, crossSignatureSquare;
 
   ObjectDescription() {
     w = 0;
@@ -22,64 +26,85 @@ struct ObjectDescription {
 };
 
 const bool CIRATEFI_POSITIVE_ONLY = true;
-const float HAND_TRACKER_POINTS = 20;
-const int HAND_TRACKER_WINDOW_MIN = 10;
-const int HAND_TRACKER_WINDOW_MAX = 300;
+const float HAND_TRACKER_POINTS = 15;
+const float HAND_TRACKER_POINTS_CROSS = 20;
+const int HAND_TRACKER_WINDOW_MIN = 30;
+const int HAND_TRACKER_WINDOW_MAX = 200;
 
 struct ThresholdConfiguration {
   public:
+    bool searchChecks;
     float contrastThreshold;
+    float crossContrastThreshold;
     float brightnessThreshold;
     float fingersThreshold;
+    float crossThreshold;
+    float trackingQualityThreshold;
 };
 
 const ThresholdConfiguration SEARCH_THRESHOLDS = {
+  searchChecks: true,
   contrastThreshold: 0.6,
-  brightnessThreshold: 50,
+  crossContrastThreshold: 0.4,
+  brightnessThreshold: 75,
   fingersThreshold: 0.7,
+  crossThreshold: 0.5,
+  trackingQualityThreshold: 0,
 };
 
 const ThresholdConfiguration TRACKING_THRESHOLDS = {
-  contrastThreshold: 0.7,
-  brightnessThreshold: 30,
-  fingersThreshold: 0.8,
+  searchChecks: false,
+  contrastThreshold: 0.6,
+  crossContrastThreshold: 0.6,
+  brightnessThreshold: 50,
+  fingersThreshold: 0.7,
+  crossThreshold: 0.6,
+  trackingQualityThreshold: 0,
 };
 
 const ThresholdConfiguration MEASURE_THRESHOLDS = {
-  contrastThreshold: 0.2,
+  searchChecks: false,
+  contrastThreshold: 0.1,
+  crossContrastThreshold: 0.1,
   brightnessThreshold: 125,
-  fingersThreshold: 0.55,
+  fingersThreshold: 0.45,
+  crossThreshold: 0.25,
+  trackingQualityThreshold: 0.4,
 };
 
-float interpolate(Mat &img, float x, float y, unsigned char draw) {
-  img.at<rgb>(y, x).b = std::max(img.at<rgb>(y, x).b, draw);
-
-  int lx = x;
-  int ly = y;
-  if(lx < 0 || ly < 0) {
-    return -1e6;
-  }
-
-  int hx = lx + 1;
-  int hy = ly + 1;
-  if(hx >= img.cols || hy >= img.rows) {
-    return -1e6;
-  }
-
-  float weight_x = x - lx;
-  float weight_y = y - ly;
-
-  float v00 = img.at<rgb>(ly, lx).r;
-  float v10 = img.at<rgb>(hy, lx).r;
-  float v01 = img.at<rgb>(ly, hx).r;
-  float v11 = img.at<rgb>(hy, hx).r;
-
-  float lcol = weight_y * v10 + (1 - weight_y) * v00;
-  float hcol = weight_y * v11 + (1 - weight_y) * v01;
-
-  float result = weight_x * hcol + (1 - weight_x) * lcol;
-  return result;
+float interpolate(Mat &img, float x, float y, unsigned char) {
+  return img.at<rgb>(y + 0.5, x + 0.5).r;
 }
+
+// float interpolate(Mat &img, float x, float y, unsigned char draw) {
+//   img.at<rgb>(y, x).b = std::max(img.at<rgb>(y, x).b, draw);
+// 
+//   int lx = x;
+//   int ly = y;
+//   if(lx < 0 || ly < 0) {
+//     return -1e6;
+//   }
+// 
+//   int hx = lx + 1;
+//   int hy = ly + 1;
+//   if(hx >= img.cols || hy >= img.rows) {
+//     return -1e6;
+//   }
+// 
+//   float weight_x = x - lx;
+//   float weight_y = y - ly;
+// 
+//   float v00 = img.at<rgb>(ly, lx).r;
+//   float v10 = img.at<rgb>(hy, lx).r;
+//   float v01 = img.at<rgb>(ly, hx).r;
+//   float v11 = img.at<rgb>(hy, hx).r;
+// 
+//   float lcol = weight_y * v10 + (1 - weight_y) * v00;
+//   float hcol = weight_y * v11 + (1 - weight_y) * v01;
+// 
+//   float result = weight_x * hcol + (1 - weight_x) * lcol;
+//   return result;
+// }
 
 class Image {
   public:
@@ -235,7 +260,7 @@ struct CorrelationCoefficient {
 template<typename I, typename J>
 CorrelationCoefficient<typename I::value_type> correlationCoefficient(
     const I &is, const I &ie, const J &js, const J &je,
-    const ThresholdConfiguration &thresholds) {
+    const float &contrastThreshold, const float &brightnessThreshold) {
   struct CorrelationCoefficient<typename I::value_type> result;
 
   const typename I::value_type xm = mean(is, ie);
@@ -255,12 +280,12 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficient(
     return result;
   }
 
-  if(fabs(beta) < thresholds.contrastThreshold || 1 / thresholds.contrastThreshold < fabs(beta)) {
+  if(fabs(beta) < contrastThreshold || 1 / contrastThreshold < fabs(beta)) {
     result.corr = 0;
     return result;
   }
 
-  if(fabs(gamma) > thresholds.brightnessThreshold) {
+  if(fabs(gamma) > brightnessThreshold) {
     result.corr = 0;
     return result;
   }
@@ -275,7 +300,7 @@ template<typename I, typename J>
 CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConst(
     const I &is, const I &ie, const typename I::value_type im, const typename I::value_type i2,
     const J &js, const J &je,
-    const ThresholdConfiguration &thresholds) {
+    const float &contrastThreshold, const float &brightnessThreshold) {
   struct CorrelationCoefficient<typename I::value_type> result;
 
   const typename iterator_traits<I>::value_type xm = im;
@@ -295,12 +320,12 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConst(
     return result;
   }
 
-  if(fabs(beta) < thresholds.contrastThreshold || 1 / thresholds.contrastThreshold < fabs(beta)) {
+  if(fabs(beta) < contrastThreshold || 1 / contrastThreshold < fabs(beta)) {
     result.corr = 0;
     return result;
   }
 
-  if(fabs(gamma) > thresholds.brightnessThreshold) {
+  if(fabs(gamma) > brightnessThreshold) {
     result.corr = 0;
     return result;
   }
@@ -321,14 +346,8 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConstRi
   const typename iterator_traits<I>::value_type xm = im;
   const typename iterator_traits<J>::value_type ym = jm;
 
-  if(im == 12345451) cout << "!" << endl;
-  if(jm == 12345451) cout << "!" << endl;
-
   const typename I::value_type xx = i2;
   const typename I::value_type xy = meanDotProductLeftConst(is, ie, js, je, ym);
-
-  if(xx == 12345451) cout << "!" << endl;
-  if(xy == 12345451) cout << "!" << endl;
 
   float beta = xy / xx;
   float gamma = ym - beta * xm;
@@ -361,7 +380,7 @@ template<typename I, typename J>
 CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConstRightConst(
     const I &is, const I &ie, const typename I::value_type im, const typename I::value_type i2,
     const J &js, const J &je, const typename J::value_type jm, const typename J::value_type j2,
-    const ThresholdConfiguration &thresholds) {
+    const float &contrastThreshold, const float &brightnessThreshold) {
   struct CorrelationCoefficient<typename I::value_type> result;
 
   const typename iterator_traits<I>::value_type xm = im;
@@ -381,12 +400,12 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConstRi
     return result;
   }
 
-  if(fabs(beta) < thresholds.contrastThreshold || 1 / thresholds.contrastThreshold < fabs(beta)) {
+  if(fabs(beta) < contrastThreshold || 1 / contrastThreshold < fabs(beta)) {
     result.corr = 0;
     return result;
   }
 
-  if(fabs(gamma) > thresholds.brightnessThreshold) {
+  if(fabs(gamma) > brightnessThreshold) {
     result.corr = 0;
     return result;
   }
@@ -395,6 +414,40 @@ CorrelationCoefficient<typename I::value_type> correlationCoefficientLeftConstRi
   result.corr = xy / sqrt(xx * yy);
 
   return result;
+}
+
+void sampleFinger(std::vector<float> &measured, const ObjectDescription &obj,
+    Image &img, int x, int y, float scale) {
+  float xi = x - (obj.w / 2 * scale);
+  const float dx = obj.w * scale / HAND_TRACKER_POINTS;
+  for(int i = 0; i < HAND_TRACKER_POINTS; ++i, xi += dx) {
+    if(xi < 0 || xi >= img.cols) {
+      measured.push_back(-1e6);
+    } else {
+      measured.push_back(interpolate(img.data, xi, y, 0));
+    }
+  }
+}
+
+void sampleCross(std::vector<float> &measured, const ObjectDescription &obj,
+    Image &img, int x, int y, float scale) {
+  float xi = x - (obj.w / 2 * scale);
+  for(int i = 0; i < HAND_TRACKER_POINTS; ++i, xi += obj.w * scale / HAND_TRACKER_POINTS_CROSS) {
+    float yi = y - (obj.h / 2 * scale);
+    for(int j = 0; j < HAND_TRACKER_POINTS; ++j, yi += obj.h * scale / HAND_TRACKER_POINTS_CROSS) {
+      if(xi < 0 || xi >= img.cols || yi < 0 || yi >= img.rows) {
+        measured.push_back(-1e6);
+      } else {
+        measured.push_back(interpolate(img.data, xi, yi, 0));
+      }
+    }
+  }
+}
+
+void extractMeanAndSquare(std::vector<float> &vs, float &v_mean, float &v_square) {
+  v_mean = mean(vs.begin(), vs.end());
+  for(auto &v: vs) v -= v_mean;
+  v_square = meanDotSquare(vs.begin(), vs.end(), 0.0);
 }
 
 ObjectDescription measureObject(Image &img, int sx, int sy, int ex, int ey) {
@@ -413,14 +466,16 @@ ObjectDescription measureObject(Image &img, int sx, int sy, int ex, int ey) {
 
   float w = ex - sx; result.w = w;
   float h = ey - sy; result.h = h;
-  // int cx = sx + w / 2;
-  int cy = sy + h / 2;
 
-  float x = sx;
-  for(int i = 0; i < HAND_TRACKER_POINTS; ++i, x += w / HAND_TRACKER_POINTS) {
-    // result.fingerSignature.push_back(img.data.at<rgb>(cy, x).r);
-    result.fingerSignature.push_back(interpolate(img.data, x, cy, 255));
-  }
+  float cx = (sx + ex) / 2;
+  float cy = (sy + ey) / 2;
+
+  sampleFinger(result.fingerSignature, result, img, cx, cy, 1);
+  extractMeanAndSquare(result.fingerSignature,
+      result.fingerSignatureMean, result.fingerSignatureSquare);
+  sampleCross(result.crossSignature, result, img, cx, cy, 1);
+  extractMeanAndSquare(result.crossSignature,
+      result.crossSignatureMean, result.crossSignatureSquare);
 
   return result;
 }
@@ -467,13 +522,26 @@ void trackObject(Image &img, const ObjectDescription &templ, FingerMatchQuality 
   for(float dy = -2; dy < 3; ++dy) {
     for(float dx = -2; dx < 3; ++dx) {
       ObjectDescription candidate = measureObject(img,
-          dx + match.x - match.w / 2 + 0.1, dy + match.y - 1,
-          dx + match.x + match.w / 2 - 0.1, dy + match.y + 1);
+          dx + match.x - match.w / 2 + 0.1, dy + match.y - match.h / 2 + 0.1,
+          dx + match.x + match.w / 2 - 0.1, dy + match.y + match.h / 2 - 0.1);
 
-      float corr = correlationCoefficient(
+      auto fingerCorr = correlationCoefficientLeftConstRightConst(
           templ.fingerSignature.begin(), templ.fingerSignature.end(),
+          templ.fingerSignatureMean, templ.fingerSignatureSquare,
           candidate.fingerSignature.begin(), candidate.fingerSignature.end(),
-          thresholds).corr;
+          candidate.fingerSignatureMean, candidate.fingerSignatureSquare,
+          thresholds.contrastThreshold, thresholds.brightnessThreshold);
+      auto crossCorr = correlationCoefficientLeftConstRightConst(
+          templ.crossSignature.begin(), templ.crossSignature.end(),
+          templ.crossSignatureMean, templ.crossSignatureSquare,
+          candidate.crossSignature.begin(), candidate.crossSignature.end(),
+          candidate.crossSignatureMean, candidate.crossSignatureSquare,
+          thresholds.crossContrastThreshold, thresholds.brightnessThreshold);
+      float corr = fingerCorr.corr + crossCorr.corr;
+
+      cout << fingerCorr.corr << ","
+        << crossCorr.corr << "." << crossCorr.beta << "." << crossCorr.gamma << endl;
+
       if(corr > bestCorr) {
         bestCorr = corr;
 
@@ -487,7 +555,8 @@ void trackObject(Image &img, const ObjectDescription &templ, FingerMatchQuality 
 
   cout << "tracking quality: " << bestCorr << endl;
 
-  if(bestCorr < thresholds.fingersThreshold) {
+  if(bestCorr < thresholds.trackingQualityThreshold) {
+    cout << "tracking lost" << endl;
     track = ObjectDescription();
   }
 }
@@ -497,22 +566,67 @@ FingerMatchQuality compareFingers(const ObjectDescription &obj,
     const ThresholdConfiguration &thresholds) {
   FingerMatchQuality result;
 
-  for(float scale = 0.5; scale < 3; scale *= 1.1) {
-    std::vector<float> measured;
-    float xi = x - (obj.w / 2 * scale);
-    for(int i = 0; i < HAND_TRACKER_POINTS; ++i, xi += obj.w * scale / HAND_TRACKER_POINTS) {
-      if(xi < 0 || xi >= img.cols) {
-        measured.push_back(-1e6);
-      } else {
-        measured.push_back(interpolate(img.data, xi, y, 0));
-        // measured.push_back(img.data.at<rgb>(y, xe).r);
-      }
+  for(float scale = 0.75; scale < 1.5; scale *= 1.1) {
+    static std::vector<float> measured;
+    measured.clear();
+
+    sampleFinger(measured, obj, img, x, y, scale);
+
+    auto corrCoeff = correlationCoefficientLeftConst(
+      obj.fingerSignature.begin(), obj.fingerSignature.end(),
+      obj.fingerSignatureMean, obj.fingerSignatureSquare,
+      measured.begin(), measured.end(),
+      thresholds.contrastThreshold, thresholds.brightnessThreshold);
+    if(fabs(corrCoeff.gamma) > thresholds.brightnessThreshold) {
+      break;
     }
 
-    auto corrCoeff = correlationCoefficient(
-      obj.fingerSignature.begin(), obj.fingerSignature.end(),
+    if(fabs(corrCoeff.corr) > result.score) {
+      result.score = fabs(corrCoeff.corr);
+      result.beta = corrCoeff.beta;
+      result.gamma = corrCoeff.gamma;
+      result.scale = scale;
+      result.x = x;
+      result.y = y;
+      result.w = obj.w * scale;
+      result.h = obj.h * scale;
+    }
+  }
+
+  return result;
+}
+
+struct CrossMatchQuality {
+  bool windowed;
+  float score;
+  float scale;
+  int startQuery;
+  float beta, gamma;
+  float x, y;
+  float w, h;
+
+  CrossMatchQuality() {
+    score = 0;
+    scale = 0;
+    windowed = false;
+  }
+};
+
+CrossMatchQuality compareCross(const ObjectDescription &obj,
+    Image &img, int x, int y, float fingerScale,
+    const ThresholdConfiguration &thresholds) {
+  CrossMatchQuality result;
+
+  for(float scale = fingerScale * 0.8; scale < fingerScale * 1.2; scale *= 1.1) {
+    std::vector<float> measured;
+
+    sampleCross(measured, obj, img, x, y, scale);
+
+    auto corrCoeff = correlationCoefficientLeftConst(
+      obj.crossSignature.begin(), obj.crossSignature.end(),
+      obj.crossSignatureMean, obj.crossSignatureSquare,
       measured.begin(), measured.end(),
-      thresholds);
+      thresholds.crossContrastThreshold, thresholds.brightnessThreshold);
     if(fabs(corrCoeff.corr) > result.score) {
       result.score = fabs(corrCoeff.corr);
       result.beta = corrCoeff.beta;
@@ -605,14 +719,15 @@ class CiratefiTracker {
     CiratefiTracker(int width, int height): cols(width), rows(height) { }
 
     void setTemplate(Mat &reference, int sx, int sy, int ex, int ey) {
-      GaussianBlur(reference, reference, cv::Size{0,0}, 2, 10);
+      GaussianBlur(reference, reference, cv::Size{0,0}, 2, 2);
 
       Image referenceImage(reference);
       templ = measureObject(referenceImage, sx, sy, ex, ey);
     }
 
     FingerMatchQuality searchObject(const ObjectDescription &obj, Image &img,
-        int sx, int sy, int ex, int ey, const ThresholdConfiguration &thresholds) {
+        int sx, int sy, int ex, int ey, const ThresholdConfiguration &thresholds,
+        int mgreen, int mblue) {
       FingerMatchQuality best;
       
       sx = sx < 0? 0: sx;
@@ -620,22 +735,45 @@ class CiratefiTracker {
       ex = img.cols < ex? img.cols: ex;
       ey = img.rows < ey? img.rows: ey;
 
-      for(int y = sy; y < ey; ++y) {
-        for(int x = sx; x < ex; ++x) {
+      for(int y = sy; y < ey; y += 3) {
+        for(int x = sx; x < ex; x += 3) {
           auto fingers = compareFingers(obj, img, x, y, thresholds);
-          if(fingers.score > best.score) {
-            best = fingers;
+          if(fingers.score < thresholds.fingersThreshold) continue;
+
+          img.data.at<rgb>(y, x).g = mgreen / 4;
+          img.data.at<rgb>(y, x).b = mblue / 4;
+
+          if(thresholds.searchChecks) {
+            auto fingersAbove = compareFingers(obj, img, x, y - (obj.h / 3) * fingers.scale, thresholds);
+            if(fingersAbove.score < thresholds.fingersThreshold) continue;
           }
-          if(fingers.score > thresholds.fingersThreshold) {
-            cout << fingers.score << "@" << x << "," << y << "  " << fingers.scale << endl;
-            img.data.at<rgb>(y, x).g = 255;
+
+          img.data.at<rgb>(y, x).g = mgreen / 2;
+          img.data.at<rgb>(y, x).b = mblue / 2;
+
+          for(int yy = -1; yy < 2; ++yy) {
+            for(int xx = -1; xx < 2; ++xx) {
+              auto cross = compareCross(obj, img, x + xx, y + yy, fingers.scale, thresholds);
+              cout << fingers.score <<
+                "/" << cross.score << "β" << cross.beta << "γ" << cross.gamma <<
+                "@" << x << "," << y <<
+                "  " << fingers.scale << endl;
+              if(cross.score < thresholds.crossThreshold) continue;
+
+              img.data.at<rgb>(y + yy, x + xx).g = mgreen;
+              img.data.at<rgb>(y + yy, x + xx).b = mblue;
+
+              if(fingers.score > best.score) {
+                best = fingers;
+              }
+            }
           }
         }
-        cout << y << endl;
+        // cout << sx << "-" << ex << "," << y << endl;
       }
 
       cout << "BEST SCORE: " << best.score << endl;
-      if(best.score <= thresholds.fingersThreshold) {
+      if(best.score < thresholds.fingersThreshold) {
         best.score = 0;
       }
 
@@ -648,7 +786,7 @@ class CiratefiTracker {
     }
 
     void handleFrame(Mat &query) {
-      GaussianBlur(query, query, cv::Size{0,0}, 2, 10);
+      GaussianBlur(query, query, cv::Size{0,0}, 2, 2);
       Image queryImg(query);
 
       FingerMatchQuality best;
@@ -659,28 +797,38 @@ class CiratefiTracker {
               trackMatch.y - window,
               trackMatch.x + window,
               trackMatch.y + window,
-              TRACKING_THRESHOLDS);
+              TRACKING_THRESHOLDS,
+              255, 0);
         }
       }
 
-      if(track.w && best.score <= 0) {
-        best = searchObject(track, queryImg, 0, 0, queryImg.cols, queryImg.rows, SEARCH_THRESHOLDS);
-      }
+      // if(track.w && best.score <= 0) {
+      //   best = searchObject(track, queryImg, 0, 0, queryImg.cols, queryImg.rows, SEARCH_THRESHOLDS, 255, 255);
+      // }
       if(best.score <= 0 || best.windowed) {
-        best = searchObject(templ, queryImg, 0, 0, queryImg.cols, queryImg.rows, SEARCH_THRESHOLDS);
+        best = searchObject(templ, queryImg, 0, 0, queryImg.cols, queryImg.rows, SEARCH_THRESHOLDS, 0, 255);
       }
 
       if(best.score > 0) {
         trackObject(queryImg, templ, best, track, trackMatch, MEASURE_THRESHOLDS);
+
+        rectangle(queryImg.data,
+                  Point(best.x - best.w / 2, best.y - best.h / 2),
+                  Point(best.x + best.w / 2, best.y + best.h / 2),
+                  Scalar(0, 0, 255),
+                  1,
+                  8);
+      } else {
+        track = ObjectDescription();
       }
 
-      imshow("Debug", queryImg.data);
+      // imshow("Debug", queryImg.data);
 
-      for(int i = 0; i < 5; ++i) {
-        if( waitKey(10) >= 0 ) {
-          throw 0;
-        }
-      }
+      // for(int i = 0; i < 5; ++i) {
+      //   if( waitKey(10) >= 0 ) {
+      //     throw 0;
+      //   }
+      // }
     }
 
   private:
@@ -694,8 +842,8 @@ class CiratefiTracker {
 
 int main(int, char**)
 {
-    namedWindow("Object Reference", WINDOW_AUTOSIZE);
-    namedWindow("Debug", WINDOW_AUTOSIZE);
+    // namedWindow("Object Reference", WINDOW_AUTOSIZE);
+    // namedWindow("Debug", WINDOW_AUTOSIZE);
 
     // Mat reference = imread("svo.0120.png", IMREAD_COLOR );
     // if(reference.empty()) {
@@ -726,10 +874,15 @@ int main(int, char**)
         return -1;
     }
 
+    // int sx = 278;
+    // int ex = 393;
+    // int sy = 130;
+    // int ey = 225;
+
     int sx = 278;
     int ex = 393;
-    int sy = 150;
-    int ey = 165;
+    int sy = 130;
+    int ey = 185;
 
     rectangle(reference,
               Point(sx - 2, sy - 2),
@@ -737,8 +890,6 @@ int main(int, char**)
               Scalar(0, 255, 0),
               1,
               8);
-
-    imshow("Object Reference", reference);
 
     // Mat test(reference.rows * 12, reference.cols * 12, CV_8UC1, 0.0);
     // for(float y = 0; y < test.rows; ++y) {
@@ -754,7 +905,10 @@ int main(int, char**)
     CiratefiTracker tracker(reference.cols, reference.rows);
     tracker.setTemplate(reference, sx, sy, ex, ey);
 
-    for(int i = 20; i < 199; ++i) {
+    // imshow("Object Reference", reference);
+
+    // for(int i = 20; i < 25; ++i) {
+    for(int i = 1; i < 199; ++i) {
       ostringstream filename;
       filename << "svo." << setw(4) << setfill('0') << i << ".png";
 
