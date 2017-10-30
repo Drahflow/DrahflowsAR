@@ -15,6 +15,7 @@ import android.util.Log;
 import android.view.MotionEvent;
 import name.drahflow.ar.geometry.Constants;
 import name.drahflow.ar.geometry.Cube;
+import name.drahflow.ar.geometry.Collection;
 
 public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Renderer  {
 	private int width;
@@ -79,7 +80,13 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 
 	private Stage vrStage = new Stage() {
 		Cube cube = new Cube(-0.01f, 0f, -0.2f, 0.005f);
+		Cube position = new Cube(0f, 0f, 0f, 0.0005f);
+		{
+			position.setTexture(Constants.YELLOW);
+		}
+		Collection scene = new Collection(cube, position);
 		float[] h = new float[9]; // the gesture transformation in camera coordinates
+		float[] pos = new float[3];
 
 		public void click() {
 			JNI.Gesture_getTransformationRelative(System.nanoTime(), h);
@@ -93,9 +100,9 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 				-0.01 * -0.01
 			);
 
-			float x = global.videoHistory.width / 4;
-			float y1 = global.videoHistory.height / 4 - 1.0f;
-			float y2 = global.videoHistory.height / 4 + 1.0f;
+			float x = global.videoHistory.width / 2;
+			float y1 = global.videoHistory.height / 2 - 5.0f;
+			float y2 = global.videoHistory.height / 2 + 5.0f;
 
 			// apply transformation to given reference coordinates
 			float tx = x * h[0] + y1 * h[1] + h[2];
@@ -119,20 +126,25 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 			float sizeAtOne = size * distanceToCamera;
 	
 			global.gestureSizeAtOne = sizeAtOne;
+			global.gestureOffset = new float[] {
+				(tx + bx) / 2, (ty + by) / 2
+			};
 
 			global.main.switchTo(new MainMenuActivity(global));
 		}
 
 		public void render() {
 			cube.setTexture(global.gestureTracker.isTrackingEstablished()? Constants.GREEN: Constants.RED);
-			global.view.renderUntracked(cube);
+			global.gestureTracker.getPosition(pos);
+			position.setPosition(-0.01f + pos[0], pos[1], 0f);
+			global.view.renderUntracked(scene);
 		}
 	};
 
-	private int minX() { return (int)(global.videoHistory.width * 0.4f); }
-	private int maxX() { return (int)(global.videoHistory.width * 0.6f); }
-	private int minY() { return (int)(global.videoHistory.width * 0.4f); }
-	private int maxY() { return (int)(global.videoHistory.width * 0.6f); }
+	private int minX() { return (int)(global.videoHistory.width * 0.40f); }
+	private int maxX() { return (int)(global.videoHistory.width * 0.60f); }
+	private int minY() { return (int)(global.videoHistory.width * 0.45f); }
+	private int maxY() { return (int)(global.videoHistory.width * 0.55f); }
 
 	public void onPause() {};
 	public void onResume() {};

@@ -18,6 +18,12 @@ public class Cube extends Solid implements Geometry {
 		this.size = size;
 	}
 
+	public void setPosition(float x, float y, float z) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+	}
+
 	private static FloatBuffer cubePositions;
 	private static FloatBuffer cubeTexCoords;
 

@@ -15,6 +15,7 @@ public class GlobalState {
 	public float cameraDistance = 0.02f;
 	public float accelerometerScale = 4f;
 	public float gestureSizeAtOne = 1f;
+	public float[] gestureOffset = new float[] { 0f, 0f };
 
 	public void onPause() {
 		if(cameraTracker != null) cameraTracker.onPause();

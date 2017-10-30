@@ -23,9 +23,9 @@ class GestureTracker {
 
 		if(gestureTransformation[8] == 0) return false;
 
-		float x = global.videoHistory.width / 4;
-		float y1 = global.videoHistory.height / 4 - 1.0f;
-		float y2 = global.videoHistory.height / 4 + 1.0f;
+		float x = global.videoHistory.width / 2;
+		float y1 = global.videoHistory.height / 2 - 5.0f;
+		float y2 = global.videoHistory.height / 2 + 5.0f;
 
 		// apply transformation to given reference coordinates
 		float tx = x * h[0] + y1 * h[1] + h[2];
@@ -48,15 +48,21 @@ class GestureTracker {
 
 		x = (tx + bx) / 2;
 		float y = (ty + by) / 2;
-		float dist = 1 / global.gestureSizeAtOne;
+
+		Log.e("Gesture", "Java-Gesture: x,y,s: " + x + "," + y + "," + size);
+
+		float dist = global.gestureSizeAtOne / size;
 		// TODO: Potentially remap distance here to obtain greater reach
+		// dist = 0.2f;
+
+		x -= global.gestureOffset[0];
+		y -= global.gestureOffset[1];
+
+		Log.e("Gesture", "Java-Gesture offsetted: x,y: " + x + "," + y);
 
 		// TODO: Centralize camera calibration
-		x -= 318.0489 / 2;
-		y -= 237.989 / 2;
-
-		x /= 540.5454;
-		y /= 539.3325;
+		x /= 540.5454 / 2;
+		y /= -539.3325 / 2;
 
 		x *= dist;
 		y *= dist;
