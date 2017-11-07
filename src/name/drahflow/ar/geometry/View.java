@@ -24,14 +24,19 @@ public class View {
 	}
 
 	public void render(Geometry g) {
+		updatePoseMatrix();
+		renderWithCachedPose(g);
+	}
+
+	public void renderWithCachedPose(Geometry g) {
 		clearScreen();
-		setCurrentPoseMatrix();
 		renderEyeViews(g);
 	}
 
 	public void renderUntracked(Geometry g) {
-		clearScreen();
 		Matrix.setIdentityM(poseMatrix, 0);
+
+		clearScreen();
 		renderEyeViews(g);
 	}
 
@@ -43,11 +48,15 @@ public class View {
 		Utils.noGlError();
 	}
 
-	private void setCurrentPoseMatrix() {
-		getPose(poseMatrix);
+	public void updatePoseMatrix() {
+		getTrackedPose(poseMatrix);
 	}
 
-	public void getPose(float[] poseMatrix) {
+	public void getCachedPose(float[] poseMatrix) {
+		System.arraycopy(this.poseMatrix, 0, poseMatrix, 0, this.poseMatrix.length);
+	}
+
+	public void getTrackedPose(float[] poseMatrix) {
 		global.cameraTracker.getTransformationAt(System.nanoTime() + global.displayLag, pose);
 
 		final float qi = pose[3];

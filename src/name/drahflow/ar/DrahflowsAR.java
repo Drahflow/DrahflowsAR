@@ -18,6 +18,7 @@ import android.graphics.SurfaceTexture;
 import android.view.View;
 import android.view.Surface;
 import android.view.Window;
+import android.view.KeyEvent;
 import android.hardware.SensorManager;
 import android.hardware.camera2.CameraManager;
 import com.epson.moverio.btcontrol.DisplayControl;
@@ -68,16 +69,19 @@ public class DrahflowsAR extends Activity {
 		global.view = new name.drahflow.ar.geometry.View(global);
 
 		mainView = new GLSurfaceView(this) {
+			@Override
 			public boolean onTouchEvent(MotionEvent e) {
 				Log.e("AR", "onTouchEvent: " + e);
 				activity.onTouchEvent(e);
 				return true;
 			}
+			@Override
 			public boolean onTrackballEvent(MotionEvent e) {
 				Log.e("AR", "onTrackballEvent: " + e);
 				return false;
 			}
 		};
+		mainView.requestFocus();
 		mainView.setEGLContextClientVersion(2);
 		mainView.setEGLConfigChooser(new GLSurfaceView.EGLConfigChooser() {
 			public EGLConfig chooseConfig(EGL10 egl, EGLDisplay display) {
@@ -110,6 +114,19 @@ public class DrahflowsAR extends Activity {
 		setContentView(mainView);
 
 		switchTo(new MainMenuActivity(global));
+	}
+
+	@Override
+	public boolean onKeyDown(int keycode, KeyEvent e) {
+		Log.e("AR", "onKeyEvent: " + e);
+		activity.onKeyEvent(e);
+		return true;
+	}
+	@Override
+	public boolean onKeyUp(int keycode, KeyEvent e) {
+		Log.e("AR", "onKeyEvent: " + e);
+		activity.onKeyEvent(e);
+		return true;
 	}
 
 	public void switchTo(ArActivity new_activity) {

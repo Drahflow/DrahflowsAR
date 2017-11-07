@@ -13,6 +13,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.KeyEvent;
 
 public class ScaleCalibrationActivity implements ArActivity, GLSurfaceView.Renderer {
 	private GlobalState global;
@@ -170,6 +171,8 @@ public class ScaleCalibrationActivity implements ArActivity, GLSurfaceView.Rende
 	public void onTouchEvent(MotionEvent e) {
 		menu.onTouchEvent(e);
 	}
+
+	public void onKeyEvent(KeyEvent e) { }
 
 	public void onPause() {};
 	public void onResume() {};

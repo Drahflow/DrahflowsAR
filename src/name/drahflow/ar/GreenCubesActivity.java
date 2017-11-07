@@ -13,12 +13,16 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.KeyEvent;
 
 public class GreenCubesActivity implements ArActivity {
 	private GlobalState global;
 
 	public void onTouchEvent(MotionEvent e) {
 		global.main.switchTo(new MainMenuActivity(global));
+	}
+
+	public void onKeyEvent(KeyEvent e) {
 	}
 
 	public void onPause() {};

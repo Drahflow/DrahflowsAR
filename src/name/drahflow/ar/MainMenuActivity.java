@@ -13,10 +13,15 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.KeyEvent;
 
 public class MainMenuActivity implements ArActivity {
 	public void onTouchEvent(MotionEvent e) {
 		menu.onTouchEvent(e);
+	}
+
+	public void onKeyEvent(KeyEvent e) {
+		// TODO: Could make menu navigatable with keypad
 	}
 
 	public void onPause() {};

@@ -13,6 +13,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.KeyEvent;
 import name.drahflow.ar.geometry.Constants;
 import name.drahflow.ar.geometry.Cube;
 import name.drahflow.ar.geometry.Collection;
@@ -32,6 +33,8 @@ public class GestureCalibrationActivity implements ArActivity, GLSurfaceView.Ren
 			currentStage.click();
 		}
 	}
+
+	public void onKeyEvent(KeyEvent e) { }
 
 	private Stage acquireStage = new Stage() {
 		public void click() {

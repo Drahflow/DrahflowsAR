@@ -599,13 +599,15 @@ class HandTracker {
     }
 
     void getTransformation(float *transformationData) {
+      float scale = trackMatch.w / templ.w;
+
       // transformationData[y * 3 + x] = ...
-      transformationData[0 * 3 + 0] = trackMatch.scale;
+      transformationData[0 * 3 + 0] = scale;
       transformationData[0 * 3 + 1] = 0;
-      transformationData[0 * 3 + 2] = trackMatch.x - templX * trackMatch.scale;
+      transformationData[0 * 3 + 2] = trackMatch.x - templX * scale;
       transformationData[1 * 3 + 0] = 0;
-      transformationData[1 * 3 + 1] = trackMatch.scale;
-      transformationData[1 * 3 + 2] = trackMatch.y - templY * trackMatch.scale;
+      transformationData[1 * 3 + 1] = scale;
+      transformationData[1 * 3 + 2] = trackMatch.y - templY * scale;
       transformationData[2 * 3 + 0] = 0;
       transformationData[2 * 3 + 1] = 0;
       transformationData[2 * 3 + 2] = 1;
