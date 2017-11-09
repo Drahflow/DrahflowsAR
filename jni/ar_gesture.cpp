@@ -645,6 +645,8 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_Gesture_1processFrame
   auto fingerFrame = frameHandler->lastFrame();
   if(!fingerFrame.get()) return;
 
+  // TODO: If null debug data array is passed, don't copy.
+  //       During normal operations, jut pass null then.
   jfloat *debugData = env->GetFloatArrayElements(debugImage, 0);
   for(int y = 0; y < cameraHeight; ++y) {
     for(int x = 0; x < cameraWidth; ++x) {
