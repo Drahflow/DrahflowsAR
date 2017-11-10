@@ -146,4 +146,6 @@ public class Cube extends Solid implements Geometry {
 		// Actually draw
 		GLES20.glDrawArrays(GLES20.GL_LINES, 0, 24);
 	}
+
+	@Override public Geometry onPointer(PointerEvent e) { return null; }
 }

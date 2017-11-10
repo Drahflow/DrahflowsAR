@@ -15,10 +15,13 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.KeyEvent;
 
+import name.drahflow.ar.geometry.PointerEvent;
+import name.drahflow.ar.geometry.Geometry;
 import name.drahflow.ar.geometry.Cube;
 import name.drahflow.ar.geometry.Translation;
 import name.drahflow.ar.geometry.Constants;
 import name.drahflow.ar.geometry.Collection;
+import name.drahflow.ar.geometry.SpaceMenu;
 
 public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 	private GlobalState global;
@@ -56,7 +59,7 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 	public MainActivity(GlobalState global) {
 		this.global = global;
 
-		pointerCube = new Cube(0, 0, 0, 0.001f);
+		pointerCube = new Cube(0, 0, 0, 0.0001f);
 		pointerCube.setTexture(Constants.YELLOW);
 
 		pointer = new Translation();
@@ -68,7 +71,8 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 		Cube cube2 = new Cube(0, 0, -0.25f, 0.005f);
 		cube2.setTexture(Constants.RED);
 
-		scene = new Collection(cube1, cube2, pointer);
+		Geometry menu = new SpaceMenu(global);
+		scene = new Collection(cube1, cube2, pointer, menu);
 	}
 
 	@Override public void onSurfaceCreated(GL10 glUnused, EGLConfig config) { }
@@ -80,8 +84,10 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 
 	private Cube pointerCube;
 	private Translation pointer;
-	private float[] pointerXYZ = new float[3];
 	private Collection scene;
+	private Geometry focusedElement = null;
+	private PointerEvent pointerEvent = new PointerEvent();
+	private float[] pointerXYZ = new float[3];
 
 	private boolean keypadCursor = false;
 	private float keypadCursorDistance;
@@ -96,7 +102,6 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 		boolean activeCursor = false;
 		if(keypadCursor) {
 			activeCursor = true;
-			// FIXME: Reverse camera view here
 			x = -global.cameraDistance;
 			y = 0;
 			z = -keypadCursorDistance;
@@ -108,24 +113,38 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 		}
 
 		if(activeCursor) {
+			pointerCube.setTexture(global.cameraTracker.hasGoodTracking()? Constants.YELLOW: Constants.RED);
+
 			global.view.getCachedPose(poseMatrix);
 			Matrix.invertM(inversePoseMatrix, 0, poseMatrix, 0);
 			final float[] ivp = inversePoseMatrix;
 			
-			pointerXYZ[0] = x * ivp[0] + y * ivp[4] + z * ivp[8] + ivp[12];
-			pointerXYZ[1] = x * ivp[1] + y * ivp[5] + z * ivp[9] + ivp[13];
-			pointerXYZ[2] = x * ivp[2] + y * ivp[6] + z * ivp[10] + ivp[14];
+			pointerEvent.x = x * ivp[0] + y * ivp[4] + z * ivp[8] + ivp[12];
+			pointerEvent.y = x * ivp[1] + y * ivp[5] + z * ivp[9] + ivp[13];
+			pointerEvent.z = x * ivp[2] + y * ivp[6] + z * ivp[10] + ivp[14];
 			float w = x * ivp[3] + y * ivp[7] + z * ivp[11] + ivp[15];
 
-			pointerXYZ[0] /= w;
-			pointerXYZ[1] /= w;
-			pointerXYZ[2] /= w;
+			pointerEvent.x /= w;
+			pointerEvent.y /= w;
+			pointerEvent.z /= w;
 
-			Log.e("AR", "pointerXYZ: " + pointerXYZ[0] + "," + pointerXYZ[1] + "," + pointerXYZ[2]);
 			pointer.setSubgraph(pointerCube);
-			pointer.setTranslation(pointerXYZ);
+			pointer.setTranslation(pointerEvent.x, pointerEvent.y, pointerEvent.z);
+
+			pointerEvent.timestamp = System.nanoTime();
+			pointerEvent.focusedOn = focusedElement;
+			pointerEvent.active = activeCursor;
+
+			focusedElement = scene.onPointer(pointerEvent);
 		} else {
 			pointer.setSubgraph(null);
+
+			if(focusedElement != null) {
+				pointerEvent.active = false;
+				scene.onPointer(pointerEvent);
+			}
+
+			focusedElement = null;
 		}
 
 		global.view.renderWithCachedPose(scene);

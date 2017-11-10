@@ -12,10 +12,10 @@ public class Translation implements Geometry {
 		subgraph = g;
 	}
 
-	public void setTranslation(float[] xyz) {
-		x = xyz[0];
-		y = xyz[1];
-		z = xyz[2];
+	public void setTranslation(float x, float y, float z) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
 	}
 
 	public void render(float[] vpsMatrix) {
@@ -25,5 +25,22 @@ public class Translation implements Geometry {
 		Matrix.translateM(subgraphMatrix, 0, x, y, z);
 
 		subgraph.render(subgraphMatrix);
+	}
+
+	@Override
+	public Geometry onPointer(PointerEvent e) {
+		if(subgraph == null) return null;
+
+		try {
+			e.x -= x;
+			e.y -= y;
+			e.z -= z;
+
+			return subgraph.onPointer(e);
+		} finally {
+			e.x += x;
+			e.y += y;
+			e.z += z;
+		}
 	}
 }

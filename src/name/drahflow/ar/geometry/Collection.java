@@ -15,4 +15,14 @@ public class Collection implements Geometry {
 			g.render(vpsMatrix);
 		}
 	}
+
+	@Override
+	public Geometry onPointer(PointerEvent e) {
+		for(Geometry g: children) {
+			Geometry f = g.onPointer(e);
+			if(f != null) return f;
+		}
+
+		return null;
+	}
 }

@@ -108,10 +108,10 @@ struct SensorFusion: public UnscentedKalmanFilter<D> {
 
       Quaternion<double> q(rot_w, rot_x, rot_y, rot_z);
 
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "q XYZW: %lf %lf %lf %lf",
-          q.x(), q.y(), q.z(), q.w());
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "qdt XYZW: %lf %lf %lf %lf",
-          qdt.x(), qdt.y(), qdt.z(), qdt.w());
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "q XYZW: %lf %lf %lf %lf",
+      //     q.x(), q.y(), q.z(), q.w());
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "qdt XYZW: %lf %lf %lf %lf",
+      //     qdt.x(), qdt.y(), qdt.z(), qdt.w());
 
       q = q * qdt;
 
@@ -127,11 +127,11 @@ struct SensorFusion: public UnscentedKalmanFilter<D> {
       rot_y = q.y() / new_mag;
       rot_z = q.z() / new_mag;
 
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "final rotXYZW: %lf %lf %lf %lf",
-          rot_x,
-          rot_y,
-          rot_z,
-          rot_w);
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "final rotXYZW: %lf %lf %lf %lf",
+      //     rot_x,
+      //     rot_y,
+      //     rot_z,
+      //     rot_w);
     }
 };
 
@@ -164,7 +164,7 @@ static bool trackingEstablished;
 
 JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1prepare
   (JNIEnv *, jclass, jint width, jint height, jfloat, jfloat, jdouble, jdouble) {
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "Tracker starting...");
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "Tracker starting...");
 
   cameraWidth = width;
   cameraHeight = height;
@@ -295,8 +295,8 @@ static void initializeKalmanFilter(long long time_nano) {
 
 static void updateKalmanFilter(SensorFusion &sF, long long time_nano) {
   while(sF.timestamp < time_nano) {
-    __android_log_print(ANDROID_LOG_INFO, "Tracker", "t_sensor: %lld   t_frame: %lld",
-        sF.timestamp, time_nano);
+    // __android_log_print(ANDROID_LOG_INFO, "Tracker", "t_sensor: %lld   t_frame: %lld",
+    //     sF.timestamp, time_nano);
 
     const long int dt_int = std::min(time_nano - sF.timestamp, 10000000ll);
     const double dt = dt_int / 100000000.0;
@@ -316,19 +316,19 @@ static void saveTransformation(JNIEnv *env, SensorFusion &filter, jfloatArray tr
     throw std::runtime_error("Transformation output buffer is not 7 elements long.");
   }
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEA");
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEA");
 
   jfloat *transformationData = env->GetFloatArrayElements(transformation, 0);
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMED");
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMED");
   transformationData[0] = filter.state().x(X_x);
   transformationData[1] = filter.state().x(X_y);
   transformationData[2] = filter.state().x(X_z);
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEE");
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEE");
   transformationData[3] = filter.rot_x;
   transformationData[4] = filter.rot_y;
   transformationData[5] = filter.rot_z;
   transformationData[6] = filter.rot_w;
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEF");
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEF");
   env->ReleaseFloatArrayElements(transformation, transformationData, 0);
 }
 
@@ -371,10 +371,10 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1processFrame
     return;
   }
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEB");
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEB");
   // FIXME: This can apparently die...
   auto pose = frameHandler->lastFrame()->T_f_w_.inverse();
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEC");
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "FIXMEC");
   auto trans = pose.translation();
   auto rot = pose.unit_quaternion();
 
@@ -407,33 +407,33 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1processFrame
     sF->rot_z = rot.z();
     sF->rot_w = rot.w();
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "XYZ: %lf %lf %lf",
-      sF->state().x(X_x),
-      sF->state().x(X_y),
-      sF->state().x(X_z));
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "vXYZ: %lf %lf %lf",
-      sF->state().x(V_x),
-      sF->state().x(V_y),
-      sF->state().x(V_z));
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
-      sF->state().x(A_x),
-      sF->state().x(A_y),
-      sF->state().x(A_z));
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(XYZ): %lf %lf %lf",
-      sF->state().P(X_x, X_x),
-      sF->state().P(X_y, X_y),
-      sF->state().P(X_z, X_z));
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "rot: %lf %lf %lf %lf",
-      sF->rot_x,
-      sF->rot_y,
-      sF->rot_z,
-      sF->rot_w);
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "XYZ: %lf %lf %lf",
+  //     sF->state().x(X_x),
+  //     sF->state().x(X_y),
+  //     sF->state().x(X_z));
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "vXYZ: %lf %lf %lf",
+  //     sF->state().x(V_x),
+  //     sF->state().x(V_y),
+  //     sF->state().x(V_z));
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
+  //     sF->state().x(A_x),
+  //     sF->state().x(A_y),
+  //     sF->state().x(A_z));
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(XYZ): %lf %lf %lf",
+  //     sF->state().P(X_x, X_x),
+  //     sF->state().P(X_y, X_y),
+  //     sF->state().P(X_z, X_z));
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "rot: %lf %lf %lf %lf",
+  //     sF->rot_x,
+  //     sF->rot_y,
+  //     sF->rot_z,
+  //     sF->rot_w);
   }
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "ID: %d, #Features: %d, took %lf ms",
-      frameHandler->lastFrame()->id_,
-      frameHandler->lastNumObservations(),
-      frameHandler->lastProcessingTime() * 1000);
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "ID: %d, #Features: %d, took %lf ms",
+  //     frameHandler->lastFrame()->id_,
+  //     frameHandler->lastNumObservations(),
+  //     frameHandler->lastProcessingTime() * 1000);
 }
 
 class RecordedAccelerometerEvent: public RecordedEvent {
@@ -446,7 +446,7 @@ class RecordedAccelerometerEvent: public RecordedEvent {
     }
 
     void applyTo(SensorFusion &sF) {
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "Updating from accelerometer...");
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "Updating from accelerometer...");
 
       updateKalmanFilter(sF, timestamp);
 
@@ -471,20 +471,20 @@ class RecordedAccelerometerEvent: public RecordedEvent {
             return ret;
           }, observation);
 
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
-          sF.state().x(g_x),
-          sF.state().x(g_y),
-          sF.state().x(g_z));
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
-          sF.state().x(A_x),
-          sF.state().x(A_y),
-          sF.state().x(A_z));
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(aXYZ): %lf %lf %lf",
-          sF.state().P(A_x, A_x),
-          sF.state().P(A_y, A_y),
-          sF.state().P(A_z, A_z));
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sF.state().x(MapScale));
-      __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sF.state().P(MapScale, MapScale));
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "gXYZ: %lf %lf %lf",
+      //     sF.state().x(g_x),
+      //     sF.state().x(g_y),
+      //     sF.state().x(g_z));
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "aXYZ: %lf %lf %lf",
+      //     sF.state().x(A_x),
+      //     sF.state().x(A_y),
+      //     sF.state().x(A_z));
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(aXYZ): %lf %lf %lf",
+      //     sF.state().P(A_x, A_x),
+      //     sF.state().P(A_y, A_y),
+      //     sF.state().P(A_z, A_z));
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "Map Scale: %lf", sF.state().x(MapScale));
+      // __android_log_print(ANDROID_LOG_INFO, "Tracker", "sigma(Map Scale): %lf", sF.state().P(MapScale, MapScale));
     }
 };
 
@@ -528,8 +528,8 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1processAccelerometer
 
    jfloat *xyzData = env->GetFloatArrayElements(xyz, 0);
 
-   __android_log_print(ANDROID_LOG_INFO, "Tracker", "accelXYZ: %f %f %f",
-       xyzData[0], xyzData[1], xyzData[2]);
+   // __android_log_print(ANDROID_LOG_INFO, "Tracker", "accelXYZ: %f %f %f",
+   //     xyzData[0], xyzData[1], xyzData[2]);
 
    RecordedAccelerometerEvent *record = new RecordedAccelerometerEvent(time_nano, xyzData);
    events.lock()->push_back(record);
@@ -548,8 +548,8 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1processGyroscope
 
   jfloat *xyzData = env->GetFloatArrayElements(xyz, 0);
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "gyr data XYZ: %f %f %f",
-      xyzData[0], xyzData[1], xyzData[2]);
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "gyr data XYZ: %f %f %f",
+  //     xyzData[0], xyzData[1], xyzData[2]);
 
   RecordedGyroscopeEvent *record = new RecordedGyroscopeEvent(time_nano, xyzData);
   events.lock()->push_back(record);
@@ -561,7 +561,7 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1getTransformation
   (JNIEnv *env, jclass, jlong time_nano, jfloatArray transformation) {
   if(!trackingEstablished) return;
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "Starting event playback...");
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "Starting event playback...");
 
   SensorFusion tmp(V::Zero(), M::Zero());
   {
@@ -596,11 +596,11 @@ JNIEXPORT void JNICALL Java_name_drahflow_ar_JNI_SVO_1getTransformation
      ev->end()
   );
 
-  __android_log_print(ANDROID_LOG_INFO, "Tracker", "event queue: %d, est. XYZ: %lf %lf %lf",
-      ev->size(),
-      tmp.state().x(X_x),
-      tmp.state().x(X_y),
-      tmp.state().x(X_z));
+  // __android_log_print(ANDROID_LOG_INFO, "Tracker", "event queue: %d, est. XYZ: %lf %lf %lf",
+  //     ev->size(),
+  //     tmp.state().x(X_x),
+  //     tmp.state().x(X_y),
+  //     tmp.state().x(X_z));
 
   saveTransformation(env, tmp, transformation);
 }

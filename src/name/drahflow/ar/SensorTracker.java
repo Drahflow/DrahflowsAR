@@ -39,7 +39,7 @@ class SensorTracker {
 
 			@Override
 			public void onSensorChanged(SensorEvent e) {
-				Log.e("AR", String.format("Acceleration: %6.4f,%6.4f,%6.4f", e.values[0], e.values[1], e.values[2]));
+				// Log.e("AR", String.format("Acceleration: %6.4f,%6.4f,%6.4f", e.values[0], e.values[1], e.values[2]));
 				tracker.processAccelerometerEvent(e);
 			}
 		};
@@ -51,7 +51,7 @@ class SensorTracker {
 
 			@Override
 			public void onSensorChanged(SensorEvent e) {
-				Log.e("AR", String.format("Gyroscope: %6.4f,%6.4f,%6.4f", e.values[0], e.values[1], e.values[2]));
+				// Log.e("AR", String.format("Gyroscope: %6.4f,%6.4f,%6.4f", e.values[0], e.values[1], e.values[2]));
 				tracker.processGyroscopeEvent(e);
 			}
 		};
