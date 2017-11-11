@@ -1,7 +1,7 @@
 package name.drahflow.ar.geometry;
 
 public class Solid {
-	private Texture texture;
+	private Texture texture = Constants.RED;
 
 	public void setTexture(Texture t) {
 		texture = t;

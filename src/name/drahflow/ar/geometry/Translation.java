@@ -8,6 +8,14 @@ public class Translation implements Geometry {
 	private Geometry subgraph;
 	private float[] subgraphMatrix = new float[16];
 
+	public Translation() {
+	}
+
+	public Translation(Geometry subgraph, float x, float y, float z) {
+		setSubgraph(subgraph);
+		setTranslation(x, y, z);
+	}
+
 	public void setSubgraph(Geometry g) {
 		subgraph = g;
 	}

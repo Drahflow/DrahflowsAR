@@ -1,5 +1,6 @@
 package name.drahflow.ar.geometry;
 
+import android.opengl.GLES10;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
 import android.util.Log;
@@ -16,6 +17,8 @@ public class SpaceMenu implements Geometry {
 	private float[] activationPose;
 	private long lastMovementTimestamp;
 
+	private int activeHexagon;
+
 	private static final float SPHERE_SIZE = 0.003f;
 	private static final long MILLISECOND = 1000000;
 
@@ -23,6 +26,9 @@ public class SpaceMenu implements Geometry {
 	private static final long OPEN_TIME = 750 * MILLISECOND;
 
 	private GlobalState global;
+
+	private String[] menuTitles = new String[6];
+	private ActionCallback[] menuActions = new ActionCallback[30];
 
 	public SpaceMenu(GlobalState global) {
 		this.global = global;
@@ -33,6 +39,14 @@ public class SpaceMenu implements Geometry {
 		z = 1e6f;
 	}
 
+	public void setTitle(int i, String title) {
+		menuTitles[i] = title;
+	}
+
+	public void setAction(int i, int j, ActionCallback callback) {
+		menuActions[i * 5 + j] = callback;
+	}
+
 	private Geometry off() {
 			x = 1e6f;
 			y = 1e6f;
@@ -41,17 +55,17 @@ public class SpaceMenu implements Geometry {
 			return null;
 	}
 
+	private float distance(float dx, float dy, float dz) {
+		return (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
+	}
+
 	@Override
 	public Geometry onPointer(PointerEvent e) {
 		if(!e.active) return off();
 
+		float dist = distance(e.x - x, e.y - y, e.z - z);
+
 		if(e.focusedOn == null) {
-			float dx = e.x - x;
-			float dy = e.y - y;
-			float dz = e.z - z;
-
-			float dist = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
-
 			if(dist > SPHERE_SIZE) {
 				lastMovementTimestamp = e.timestamp;
 				x = e.x; y = e.y; z = e.z;
@@ -64,13 +78,55 @@ public class SpaceMenu implements Geometry {
 
 				lastMovementTimestamp = e.timestamp - ACTIVATION_TIME;
 				x = e.x; y = e.y; z = e.z;
+				activeHexagon = 0;
 				return this;
 			}
 
 			return null;
 		} else if(e.focusedOn == this) {
-			// FIXME handle things here
-			if(lastMovementTimestamp + 2000000000l < e.timestamp) {
+			if(dist < SPHERE_SIZE) {
+				activeHexagon = 0;
+			} else if(activeHexagon == 0) {
+				int hexagonIndex = 1;
+				for(float a = 0; a < 2 * Math.PI - 0.0001; a += Math.PI / 3) {
+					final float b = (float)(a + Math.PI / 3);
+
+					final float cx = (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(a) + Math.cos(b)) / 2);
+					final float cy = (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(a) + Math.sin(b)) / 2);
+
+					final float subDist = distance(x + SPHERE_SIZE * cx - e.x, y + SPHERE_SIZE * cy - e.y, z - e.z);
+					if(subDist < SPHERE_SIZE) {
+						activeHexagon = hexagonIndex;
+					}
+					++hexagonIndex;
+				}
+			} else if(activeHexagon > 0) {
+				final float a = (float)((activeHexagon - 1) * Math.PI / 3);
+				final float b = (float)(a + Math.PI / 3);
+				final float cx = (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(a) + Math.cos(b)) / 2);
+				final float cy = (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(a) + Math.sin(b)) / 2);
+
+				int actionIndex = 0;
+				for(float c = (float)(a + 4 * Math.PI / 3); c < a + 9 * Math.PI / 3 - 0.0001; c += Math.PI / 3) {
+					final float d = (float)(c + Math.PI / 3);
+
+					final float dx = cx + (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(c) + Math.cos(d)) / 2);
+					final float dy = cy + (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(c) + Math.sin(d)) / 2);
+
+					final float subDist = distance(x + SPHERE_SIZE * dx - e.x, y + SPHERE_SIZE * dy - e.y, z - e.z);
+					if(subDist < SPHERE_SIZE) {
+						Log.e("AR", "SpaceMenu Action Selected (" + activeHexagon + "," + actionIndex + ")");
+						ActionCallback action = menuActions[(activeHexagon - 1) * 5 + actionIndex];
+						if(action != null) {
+							action.selected(activationPose, x, y, z);
+							return off();
+						}
+					}
+					++actionIndex;
+				}
+			}
+
+			if(activeHexagon == 0 && dist > SPHERE_SIZE * 4) {
 				return off();
 			}
 
@@ -143,8 +199,8 @@ public class SpaceMenu implements Geometry {
 		for(float a = 0; a < 2 * Math.PI - 0.0001; a += Math.PI / 3) {
 			final float b = (float)(a + Math.PI / 3);
 
-			float cx = (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(a) + Math.cos(b)) / 2);
-			float cy = (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(a) + Math.sin(b)) / 2);
+			final float cx = (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(a) + Math.cos(b)) / 2);
+			final float cy = (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(a) + Math.sin(b)) / 2);
 
 			// hexagon line
 			for(float c = 0; c < 2 * Math.PI - 0.0001; c += Math.PI / 3) {
@@ -268,6 +324,15 @@ public class SpaceMenu implements Geometry {
 		GLES20.glUniformMatrix4fv(mvpsMatrixHandle, 1, false, mvpsMatrix, 0);
 
 		// Actually draw
-		GLES20.glDrawArrays(GLES20.GL_LINES, 0, 156);
+		GLES20.glDrawArrays(GLES20.GL_LINES, 0, 24);
+
+		if(activeHexagon > 0) {
+			GLES20.glDrawArrays(GLES20.GL_LINES, 24 + (activeHexagon - 1) * 22, 22);
+		}
+	}
+
+	public interface ActionCallback {
+		public String getTitle();
+		public void selected(float[] activationPose, float x, float y, float z);
 	}
 }

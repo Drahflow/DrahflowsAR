@@ -71,8 +71,48 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 		Cube cube2 = new Cube(0, 0, -0.25f, 0.005f);
 		cube2.setTexture(Constants.RED);
 
-		Geometry menu = new SpaceMenu(global);
-		scene = new Collection(cube1, cube2, pointer, menu);
+		spaceMenu = new SpaceMenu(global);
+		scene = new Collection(cube1, cube2, pointer, spaceMenu);
+
+		setupMenu();
+	}
+
+	private void setupMenu() {
+		spaceMenu.setTitle(0, "VNC");
+		spaceMenu.setAction(0, 0, new SpaceMenu.ActionCallback() {
+			@Override public String getTitle() { return "localhost:5900"; }
+			@Override public void selected(
+				final float[] activationPose,
+				final float x, final float y, final float z
+			) {
+				global.main.runOnUiThread(new Runnable() {
+					@Override public void run() {
+						Geometry vnc = new name.drahflow.ar.apps.VNC.Window(
+								global.main, "localhost", 5900);
+						synchronized(MainActivity.this) {
+							scene.add(new Translation(vnc, x, y, z));
+						}
+					}
+				});
+			}
+		});
+
+		spaceMenu.setAction(0, 1, new SpaceMenu.ActionCallback() {
+			@Override public String getTitle() { return "Test Cube"; }
+			@Override public void selected(
+				final float[] activationPose,
+				final float x, final float y, final float z
+			) {
+				global.main.runOnUiThread(new Runnable() {
+					@Override public void run() {
+						Geometry vnc = new Cube(0, 0, 0, 0.005f);
+						synchronized(MainActivity.this) {
+							scene.add(new Translation(vnc, x, y, z));
+						}
+					}
+				});
+			}
+		});
 	}
 
 	@Override public void onSurfaceCreated(GL10 glUnused, EGLConfig config) { }
@@ -83,6 +123,7 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 	}
 
 	private Cube pointerCube;
+	private SpaceMenu spaceMenu;
 	private Translation pointer;
 	private Collection scene;
 	private Geometry focusedElement = null;
@@ -93,7 +134,7 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 	private float keypadCursorDistance;
 
 	@Override
-	public void onDrawFrame(GL10 glUnused) {
+	public synchronized void onDrawFrame(GL10 glUnused) {
 		// FIXME: This is not optimal; it should use a Choreographer to reduce display latency
 
 		global.view.updatePoseMatrix();

@@ -10,6 +10,10 @@ public class Collection implements Geometry {
 		children.addAll(Arrays.asList(g));
 	}
 
+	public void add(Geometry g) {
+		children.add(g);
+	}
+
 	public void render(float[] vpsMatrix) {
 		for(Geometry g: children) {
 			g.render(vpsMatrix);
