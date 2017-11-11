@@ -31,7 +31,15 @@ abstract public class Utils {
 		return handle;
 	}
 
+	private static HashMap<String, Integer> linkedShaders = new HashMap<>();
 	static public int compileShader(final String vertexShader, final String fragmentShader, final String[] attributes) {
+		StringBuilder key = new StringBuilder();
+		key.append(vertexShader);
+		key.append(fragmentShader);
+		for(String a: attributes) key.append(a);
+		Integer linkedProgram = linkedShaders.get(key.toString());
+		if(linkedProgram != null) return linkedProgram;
+
 		final int vertexShaderHandle = compileShader(GLES20.GL_VERTEX_SHADER, vertexShader);
 		final int fragmentShaderHandle = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentShader);
 
@@ -60,6 +68,7 @@ abstract public class Utils {
 			throw new RuntimeException("Could not link shader program.");
 		}
 
+		linkedShaders.put(key.toString(), programHandle);
 		return programHandle;
 	}
 
