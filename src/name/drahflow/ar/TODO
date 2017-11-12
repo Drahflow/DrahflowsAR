@@ -1,4 +1,3 @@
-* Fix VNC scaling mode to 1-on-1 and handle the rest in texture rendering
 * Make Window positioning sensible
 * Rotate SpaceMenu + Windows to viewer
 * Add labels to the SpaceMenu
