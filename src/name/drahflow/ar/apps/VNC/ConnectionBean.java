@@ -30,7 +30,7 @@ class ConnectionBean extends ConnectionBeanStorage implements Comparable<Connect
 		setUserName("");
 		setPort(5900);
 		setColorModel(COLORMODEL.C64.nameString());
-		setScaleMode(ScaleType.MATRIX);
+		setScaleMode(ScaleType.CENTER);
 		setInputMode(Window.TOUCH_ZOOM_MODE);
 		setRepeaterId("");
 	}

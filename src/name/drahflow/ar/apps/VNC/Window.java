@@ -37,6 +37,7 @@ public class Window implements Geometry {
 				textureBitmap = Bitmap.createBitmap(
 					vncCanvas.getImageWidth(),
 					vncCanvas.getImageHeight(),
+					// 1024, 1024,
 					Bitmap.Config.ARGB_8888
 				);
 				textureCanvas = new Canvas(textureBitmap);
@@ -102,14 +103,14 @@ public class Window implements Geometry {
 		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
 		GLES20.glUniform1i(texSamplerHandle, 0);
 
+		// TODO: Initialize once
 		final int[] vncTextures = new int[1];
     // generate one texture pointer...
     GLES20.glGenTextures(1, vncTextures, 0);
     //...and bind it to our array
     GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, vncTextures[0]);
 
-    // create Nearest Filtered Texture
-    GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+    GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR_MIPMAP_LINEAR);
     GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
 
     // different possible texture parameters, e.g. GLES20.GL_CLAMP_TO_EDGE
@@ -118,6 +119,7 @@ public class Window implements Geometry {
 
     // use the Android GLUtils to specify a two-dimensional texture image from our bitmap
     GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, textureBitmap, 0);
+		GLES20.glGenerateMipmap(GLES20.GL_TEXTURE_2D);
 
 		// FIXME: Should be unscaled (and VNC window stuffed under generic transform)
 		// Matrix.scaleM(modelMatrix, 0, 0.01f, 0.01f, 0.01f);
