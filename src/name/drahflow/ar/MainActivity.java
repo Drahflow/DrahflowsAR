@@ -19,9 +19,11 @@ import name.drahflow.ar.geometry.PointerEvent;
 import name.drahflow.ar.geometry.Geometry;
 import name.drahflow.ar.geometry.Cube;
 import name.drahflow.ar.geometry.Translation;
+import name.drahflow.ar.geometry.Scaling;
 import name.drahflow.ar.geometry.Constants;
 import name.drahflow.ar.geometry.Collection;
 import name.drahflow.ar.geometry.SpaceMenu;
+import name.drahflow.ar.geometry.SpaceSelector;
 
 public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 	private GlobalState global;
@@ -87,10 +89,27 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 			) {
 				global.main.runOnUiThread(new Runnable() {
 					@Override public void run() {
-						Geometry vnc = new name.drahflow.ar.apps.VNC.Window(
-								global.main, "localhost", 5900);
 						synchronized(MainActivity.this) {
-							scene.add(new Translation(vnc, x, y, z));
+							scene.add(new SpaceSelector(global, activationPose, x, y, z,
+								new SpaceSelector.ActionCallback() {
+									public void selected(float[] activationPose,
+											final float sx, final float sy, final float sz,
+											final float ex, final float ey, final float ez) {
+										global.main.runOnUiThread(new Runnable() {
+											@Override public void run() {
+												Geometry vnc = new name.drahflow.ar.apps.VNC.Window(
+														global.main, "localhost", 5900);
+												synchronized(MainActivity.this) {
+													scene.add(
+		 												new Translation(sx, sy, sz,
+		 													new Scaling(ex - sx, ey - sy, ez - sz,
+		 														vnc)));
+												}
+											}
+										});
+									}
+								}
+							));
 						}
 					}
 				});
@@ -107,7 +126,7 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 					@Override public void run() {
 						Geometry vnc = new Cube(0, 0, 0, 0.005f);
 						synchronized(MainActivity.this) {
-							scene.add(new Translation(vnc, x, y, z));
+							scene.add(new Translation(x, y, z, vnc));
 						}
 					}
 				});

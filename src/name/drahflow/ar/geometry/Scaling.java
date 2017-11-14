@@ -2,25 +2,25 @@ package name.drahflow.ar.geometry;
 
 import android.opengl.Matrix;
 
-public class Translation implements Geometry {
+public class Scaling implements Geometry {
 	private float x, y, z;
 
 	private Geometry subgraph;
 	private float[] subgraphMatrix = new float[16];
 
-	public Translation() {
+	public Scaling() {
 	}
 
-	public Translation(float x, float y, float z, Geometry subgraph) {
+	public Scaling(float x, float y, float z, Geometry subgraph) {
 		setSubgraph(subgraph);
-		setTranslation(x, y, z);
+		setScaling(x, y, z);
 	}
 
 	public void setSubgraph(Geometry g) {
 		subgraph = g;
 	}
 
-	public void setTranslation(float x, float y, float z) {
+	public void setScaling(float x, float y, float z) {
 		this.x = x;
 		this.y = y;
 		this.z = z;
@@ -30,7 +30,7 @@ public class Translation implements Geometry {
 		if(subgraph == null) return;
 
 		System.arraycopy(vpsMatrix, 0, subgraphMatrix, 0, 16);
-		Matrix.translateM(subgraphMatrix, 0, x, y, z);
+		Matrix.scaleM(subgraphMatrix, 0, x, y, z);
 
 		subgraph.render(subgraphMatrix);
 	}
@@ -40,15 +40,15 @@ public class Translation implements Geometry {
 		if(subgraph == null) return null;
 
 		try {
-			e.x -= x;
-			e.y -= y;
-			e.z -= z;
+			e.x *= x;
+			e.y *= y;
+			e.z *= z;
 
 			return subgraph.onPointer(e);
 		} finally {
-			e.x += x;
-			e.y += y;
-			e.z += z;
+			e.x /= x;
+			e.y /= y;
+			e.z /= z;
 		}
 	}
 }

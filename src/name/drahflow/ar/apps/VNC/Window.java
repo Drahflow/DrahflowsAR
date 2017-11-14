@@ -122,8 +122,7 @@ public class Window implements Geometry {
 		GLES20.glGenerateMipmap(GLES20.GL_TEXTURE_2D);
 
 		// FIXME: Should be unscaled (and VNC window stuffed under generic transform)
-		// Matrix.scaleM(modelMatrix, 0, 0.01f, 0.01f, 0.01f);
-		Matrix.scaleM(modelMatrix, 0, 0.064f, 0.048f, 0.01f);
+		// Matrix.scaleM(modelMatrix, 0, 0.064f, 0.048f, 0.01f);
 
 		Matrix.multiplyMM(mvpsMatrix, 0, vpsMatrix, 0, modelMatrix, 0);
 		Utils.noGlError();
@@ -139,8 +138,8 @@ public class Window implements Geometry {
 	private static final FloatBuffer quadTexCoords;
 	static {
 		float[] positions = {
-			-1, -1, 0,   1, -1, 0,   1,  1, 0,
-			-1, 1, 0,   -1, -1, 0,   1,  1, 0,
+			0, 0, 0,   1, 0, 0,   1,  1, 0,
+			0, 1, 0,   0, 0, 0,   1,  1, 0,
 		};
 
 		quadPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
