@@ -1,7 +1,12 @@
 package name.drahflow.ar;
 
 import android.opengl.GLES20;
+import android.opengl.GLUtils;
 import android.util.Log;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.Canvas;
+import android.graphics.Bitmap;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -202,5 +207,38 @@ abstract public class Utils {
 		if(GLES20.glGetError() != 0) {
 			throw new RuntimeException("GLError encountered");
 		}
+	}
+
+	// Returns a static textureId (which receiver must not delete)
+	static HashMap<String, Integer> renderedTexts = new HashMap<>();
+	public static int renderText(String s) {
+		Integer texture = renderedTexts.get(s);
+		if(texture != null) return texture;
+
+		Paint textPaint = new Paint();
+		textPaint.setTextSize(16);
+		textPaint.setAntiAlias(true);
+		textPaint.setARGB(0xff, 0xff, 0xff, 0xff);
+
+		Rect bounds = new Rect();
+		textPaint.getTextBounds(s, 0, s.length(), bounds);
+
+		Bitmap bitmap = Bitmap.createBitmap(bounds.width(), bounds.height(), Bitmap.Config.ARGB_8888);
+		Canvas canvas = new Canvas(bitmap);
+
+		bitmap.eraseColor(0);
+		canvas.drawText(s, 0, bounds.height(), textPaint);
+
+		int[] textures = new int[1];
+		GLES20.glGenTextures(1, textures, 0);
+		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0]);
+
+		GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+		GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+		GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
+		bitmap.recycle();
+
+		renderedTexts.put(s, textures[0]);
+		return textures[0];
 	}
 }

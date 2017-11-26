@@ -39,7 +39,7 @@ public class MainMenuActivity implements ArActivity {
 
 		menu = new Menu();
 		menu.add(new Menu.Element() {
-			{ x = -0.05f; y = 0.05f; s = 0.01f; }
+			{ x = -0.05f; y = 0.05f; s = 0.01f; title = "Camera tracking"; }
 
 			public void draw(Menu.Renderer r) {
 				draw(r, global.cameraTracker.hasGoodTracking()? Menu.GREEN: Menu.RED);
@@ -49,7 +49,7 @@ public class MainMenuActivity implements ArActivity {
 			}
 		});
 		menu.add(new Menu.Element() {
-			{ x = 0.05f; y = 0.05f; s = 0.01f; }
+			{ x = 0.05f; y = 0.05f; s = 0.01f; title = "AR calibration"; }
 
 			public void draw(Menu.Renderer r) {
 				draw(r, Menu.RED);
@@ -59,7 +59,7 @@ public class MainMenuActivity implements ArActivity {
 			}
 		});
 		menu.add(new Menu.Element() {
-			{ x = 0f; y = 0.00f; s = 0.01f; }
+			{ x = 0f; y = 0.00f; s = 0.01f; title = "Hand tracking"; }
 
 			public void draw(Menu.Renderer r) {
 				draw(r, global.gestureTracker.isTrackingEstablished()? Menu.GREEN: Menu.RED);
@@ -69,7 +69,7 @@ public class MainMenuActivity implements ArActivity {
 			}
 		});
 		menu.add(new Menu.Element() {
-			{ x = 0f; y = -0.05f; s = 0.01f; }
+			{ x = 0f; y = -0.05f; s = 0.01f; title = "Enable AR"; }
 
 			public void draw(Menu.Renderer r) {
 				draw(r,

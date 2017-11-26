@@ -1,6 +1,7 @@
-* Make Window positioning sensible
-* Rotate SpaceMenu + Windows to viewer
 * Add labels to the SpaceMenu
+* Add labels to the MainMenu
+* Draw cube preview during window positioning
+* Rotate SpaceMenu + Windows to viewer
 * Documentation
 * Demo APK
 * Hunt down Memory leaks

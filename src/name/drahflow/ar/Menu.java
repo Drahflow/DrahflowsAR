@@ -71,9 +71,13 @@ public class Menu {
 
 	abstract static class Element {
 		float x, y, s;
+		String title;
 
 		protected void draw(Renderer r, float[] color) {
 			r.drawRect(x, y, -1f, s, color);
+			if(title != null) {
+				r.drawTexture(Utils.renderText(title), x, y, -1f, s * 3);
+			}
 		}
 
 		public boolean isHit(float mx, float my) {
@@ -95,6 +99,7 @@ public class Menu {
 	
 	public class Renderer implements GLSurfaceView.Renderer {
 		private FloatBuffer rectPositions;
+		private FloatBuffer quadPositions;
 		private int positionHandle;
 		private int texCoordsHandle;
 
@@ -106,7 +111,8 @@ public class Menu {
 		private int mvpMatrixHandle;
 		private int colorHandle;
 
-		private int linkedShaderHandle;
+		private int linkedFlatShaderHandle;
+		private int linkedTexturedShaderHandle;
 
 		public Renderer() {
 			loadModelData();
@@ -114,6 +120,7 @@ public class Menu {
 
 		private void loadModelData() {
 			float[] positions = {
+				// GL_LINES version
 				-1, -1, 0,   1, -1, 0,
 				 1, -1, 0,   1,  1, 0,
 				 1,  1, 0,  -1,  1, 0,
@@ -123,6 +130,21 @@ public class Menu {
 			rectPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
 					.order(ByteOrder.nativeOrder()).asFloatBuffer();
 			rectPositions.put(positions).position(0);
+
+			positions = new float[] {
+				// GL_TRIANGLES version
+				-1, -1, 0,
+				 1, -1, 0,
+				 1,  1, 0,
+
+				-1,  1, 0,
+				-1, -1, 0,
+				 1,  1, 0,
+			};
+
+			quadPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
+					.order(ByteOrder.nativeOrder()).asFloatBuffer();
+			quadPositions.put(positions).position(0);
 		}
 
 		@Override
@@ -131,7 +153,11 @@ public class Menu {
 			GLES20.glEnable(GLES20.GL_CULL_FACE);
 			GLES20.glEnable(GLES20.GL_DEPTH_TEST);
 
-			linkedShaderHandle = Utils.compileShader(getVertexShader(), getFragmentShader(),
+			linkedFlatShaderHandle  = Utils.compileShader(getVertexShader(), getFragmentShader(),
+					new String[] {"a_Position"});
+
+			linkedTexturedShaderHandle = Utils.compileShader(
+					getTexturedVertexShader(), getTexturedFragmentShader(),
 					new String[] {"a_Position"});
 		}
 
@@ -176,10 +202,8 @@ public class Menu {
 			final float upZ = 0.0f;
 
 			// Set program handles for cube drawing.
-			mvpMatrixHandle = GLES20.glGetUniformLocation(linkedShaderHandle, "u_MVPMatrix");
-			colorHandle = GLES20.glGetUniformLocation(linkedShaderHandle, "u_Color");
-			positionHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_Position");
-			texCoordsHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_TexCoordinate");
+			colorHandle = GLES20.glGetUniformLocation(linkedFlatShaderHandle , "u_Color");
+			positionHandle = GLES20.glGetAttribLocation(linkedFlatShaderHandle , "a_Position");
 
 			Utils.noGlError();
 
@@ -207,10 +231,17 @@ public class Menu {
 			drawRect(mouseX, mouseY, -1f, 0.002f, MOUSE);
 		}
 
-		public void drawRect(float x, float y, float z, float scale, float[] color) {
+		private void setupMatrices(float x, float y, float z, float scale) {
+			// Model transformations
 			Matrix.setIdentityM(modelMatrix, 0);
+			Matrix.translateM(modelMatrix, 0, x, y, z);
+			Matrix.scaleM(modelMatrix, 0, scale, scale, scale);
+			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
+		}
 
-			GLES20.glUseProgram(linkedShaderHandle);
+		public void drawRect(float x, float y, float z, float scale, float[] color) {
+			setupMatrices(x, y, z, scale);
 
 			// Pass in the position information
 			rectPositions.position(0);
@@ -218,16 +249,32 @@ public class Menu {
 					0, rectPositions);
 			GLES20.glEnableVertexAttribArray(positionHandle);
 
-			// Model transformations
-			Matrix.translateM(modelMatrix, 0, x, y, z);
-			Matrix.scaleM(modelMatrix, 0, scale, scale, scale);
-
-			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
-			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
+			GLES20.glUseProgram(linkedFlatShaderHandle);
+			mvpMatrixHandle = GLES20.glGetUniformLocation(linkedFlatShaderHandle , "u_MVPMatrix");
 			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
 			GLES20.glUniform4fv(colorHandle, 1, color, 0);
 
 			GLES20.glDrawArrays(GLES20.GL_LINES, 0, rectPositions.limit() / 3);
+		}
+
+		public void drawTexture(int tex, float x, float y, float z, float scale) {
+			setupMatrices(x, y, z, scale);
+
+			// Pass in the position information
+			quadPositions.position(0);
+			GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false,
+					0, quadPositions);
+			GLES20.glEnableVertexAttribArray(positionHandle);
+
+			GLES20.glUseProgram(linkedTexturedShaderHandle);
+			mvpMatrixHandle = GLES20.glGetUniformLocation(linkedTexturedShaderHandle , "u_MVPMatrix");
+			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+
+			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
+			int textureHandle = GLES20.glGetUniformLocation(linkedTexturedShaderHandle , "u_Texture");
+			GLES20.glUniform1i(textureHandle, 0);
+
+			GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, quadPositions.limit() / 3);
 		}
 
 		protected String getVertexShader() {
@@ -252,6 +299,33 @@ public class Menu {
 				+ "varying vec4 v_Color;\n"
 				+ "void main() {\n"
 				+ "   gl_FragColor = v_Color; \n"
+				+ "}\n";
+
+			return perPixelFragmentShader;
+		}
+
+		protected String getTexturedVertexShader() {
+			final String perPixelVertexShader =
+				  "uniform mat4 u_MVPMatrix;      \n"
+				+ "attribute vec4 a_Position;     \n"
+				+ "varying vec2 v_TexCoord;          \n"
+
+				+ "void main()                                \n"
+				+ "{                                          \n"
+				+ "   gl_Position = u_MVPMatrix * a_Position; \n"
+				+ "   v_TexCoord = (a_Position.xy + vec2(1.0, 1.0)) / 2.0;\n"
+				+ "}                                          \n";
+
+			return perPixelVertexShader;
+		}
+
+		protected String getTexturedFragmentShader() {
+			final String perPixelFragmentShader =
+				  "precision mediump float;\n"
+				+ "uniform sampler2D u_Texture;\n"
+				+ "varying vec2 v_TexCoord;\n"
+				+ "void main() {\n"
+				+ "   gl_FragColor = texture2D(u_Texture, v_TexCoord); \n"
 				+ "}\n";
 
 			return perPixelFragmentShader;
