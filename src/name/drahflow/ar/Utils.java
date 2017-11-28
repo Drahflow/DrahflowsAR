@@ -210,20 +210,27 @@ abstract public class Utils {
 	}
 
 	// Returns a static textureId (which receiver must not delete)
-	static HashMap<String, Integer> renderedTexts = new HashMap<>();
-	public static int renderText(String s) {
-		Integer texture = renderedTexts.get(s);
-		if(texture != null) return texture;
+	static class TextInfo {
+		public int texture;
+		public float width;
+		public float height;
+	}
+
+	static HashMap<String, TextInfo> renderedTexts = new HashMap<>();
+
+	public static TextInfo renderText(String s) {
+		TextInfo info = renderedTexts.get(s);
+		if(info != null) return info;
 
 		Paint textPaint = new Paint();
-		textPaint.setTextSize(16);
+		textPaint.setTextSize(32);
 		textPaint.setAntiAlias(true);
 		textPaint.setARGB(0xff, 0xff, 0xff, 0xff);
 
 		Rect bounds = new Rect();
 		textPaint.getTextBounds(s, 0, s.length(), bounds);
 
-		Bitmap bitmap = Bitmap.createBitmap(bounds.width(), bounds.height(), Bitmap.Config.ARGB_8888);
+		Bitmap bitmap = Bitmap.createBitmap(bounds.width() + 3, bounds.height() + 10, Bitmap.Config.ARGB_8888);
 		Canvas canvas = new Canvas(bitmap);
 
 		bitmap.eraseColor(0);
@@ -233,12 +240,17 @@ abstract public class Utils {
 		GLES20.glGenTextures(1, textures, 0);
 		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0]);
 
-		GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+		GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR_MIPMAP_LINEAR);
 		GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
 		GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
+		GLES20.glGenerateMipmap(GLES20.GL_TEXTURE_2D);
 		bitmap.recycle();
 
-		renderedTexts.put(s, textures[0]);
-		return textures[0];
+		info = new TextInfo();
+		info.texture = textures[0];
+		info.width = bounds.width();
+		info.height = bounds.height();
+		renderedTexts.put(s, info);
+		return info;
 	}
 }

@@ -76,7 +76,7 @@ public class Menu {
 		protected void draw(Renderer r, float[] color) {
 			r.drawRect(x, y, -1f, s, color);
 			if(title != null) {
-				r.drawTexture(Utils.renderText(title), x, y, -1f, s * 3);
+				r.drawText(Utils.renderText(title), x, y - 0.02f, -1f, s * 3);
 			}
 		}
 
@@ -231,17 +231,13 @@ public class Menu {
 			drawRect(mouseX, mouseY, -1f, 0.002f, MOUSE);
 		}
 
-		private void setupMatrices(float x, float y, float z, float scale) {
+		public void drawRect(float x, float y, float z, float scale, float[] color) {
 			// Model transformations
 			Matrix.setIdentityM(modelMatrix, 0);
 			Matrix.translateM(modelMatrix, 0, x, y, z);
 			Matrix.scaleM(modelMatrix, 0, scale, scale, scale);
 			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
 			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
-		}
-
-		public void drawRect(float x, float y, float z, float scale, float[] color) {
-			setupMatrices(x, y, z, scale);
 
 			// Pass in the position information
 			rectPositions.position(0);
@@ -257,8 +253,13 @@ public class Menu {
 			GLES20.glDrawArrays(GLES20.GL_LINES, 0, rectPositions.limit() / 3);
 		}
 
-		public void drawTexture(int tex, float x, float y, float z, float scale) {
-			setupMatrices(x, y, z, scale);
+		public void drawText(Utils.TextInfo text, float x, float y, float z, float scale) {
+			// Model transformations
+			Matrix.setIdentityM(modelMatrix, 0);
+			Matrix.translateM(modelMatrix, 0, x, y, z);
+			Matrix.scaleM(modelMatrix, 0, scale * text.width / 160, scale * text.height / 160, scale);
+			Matrix.multiplyMM(mvMatrix, 0, viewMatrix, 0, modelMatrix, 0);
+			Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, mvMatrix, 0);
 
 			// Pass in the position information
 			quadPositions.position(0);
@@ -270,7 +271,7 @@ public class Menu {
 			mvpMatrixHandle = GLES20.glGetUniformLocation(linkedTexturedShaderHandle , "u_MVPMatrix");
 			GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
 
-			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
+			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, text.texture);
 			int textureHandle = GLES20.glGetUniformLocation(linkedTexturedShaderHandle , "u_Texture");
 			GLES20.glUniform1i(textureHandle, 0);
 
@@ -313,7 +314,7 @@ public class Menu {
 				+ "void main()                                \n"
 				+ "{                                          \n"
 				+ "   gl_Position = u_MVPMatrix * a_Position; \n"
-				+ "   v_TexCoord = (a_Position.xy + vec2(1.0, 1.0)) / 2.0;\n"
+				+ "   v_TexCoord = vec2(a_Position.x + 1.0, -a_Position.y + 1.0) / 2.0;\n"
 				+ "}                                          \n";
 
 			return perPixelVertexShader;
