@@ -37,12 +37,21 @@ public class MainMenuActivity implements ArActivity {
 	public MainMenuActivity(GlobalState _global) {
 		global = _global;
 
-		menu = new Menu();
+		menu = new Menu() {
+			@Override protected void draw(Menu.Renderer r) {
+				r.drawText(Utils.renderText("Use touchpad to select action."), 0, 0.08f, -1, 0.03f);
+			}
+		};
+
 		menu.add(new Menu.Element() {
-			{ x = -0.05f; y = 0.05f; s = 0.01f; title = "Camera tracking"; }
+			{ x = -0.05f; y = 0.05f; s = 0.01f; title = "Reset pose tracking"; }
 
 			public void draw(Menu.Renderer r) {
 				draw(r, global.cameraTracker.hasGoodTracking()? Menu.GREEN: Menu.RED);
+				if(!global.cameraTracker.hasGoodTracking()) {
+					r.drawText(Utils.renderText("Move head left + right until green"),
+							x, y - 0.03f, -1f, s * 3);
+				}
 			}
 			public void onClick() {
 				global.cameraTracker.initialize();
@@ -69,7 +78,7 @@ public class MainMenuActivity implements ArActivity {
 			}
 		});
 		menu.add(new Menu.Element() {
-			{ x = 0f; y = -0.05f; s = 0.01f; title = "Enable AR"; }
+			{ x = 0f; y = -0.05f; s = 0.01f; title = "Switch to AR"; }
 
 			public void draw(Menu.Renderer r) {
 				draw(r,

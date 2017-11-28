@@ -24,14 +24,25 @@ import name.drahflow.ar.geometry.Constants;
 import name.drahflow.ar.geometry.Collection;
 import name.drahflow.ar.geometry.SpaceMenu;
 import name.drahflow.ar.geometry.SpaceSelector;
+import name.drahflow.ar.geometry.OverlayText;
 
 public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 	private GlobalState global;
 	private float[] poseMatrix = new float[16];
 	private float[] inversePoseMatrix = new float[16];
 
+	OverlayText[] overlays;
+
 	public void onTouchEvent(MotionEvent e) {
-		global.main.switchTo(new MainMenuActivity(global));
+		if((e.getActionMasked() == MotionEvent.ACTION_DOWN)) {
+			if(overlays[0].isShowing()) {
+				global.main.switchTo(new MainMenuActivity(global));
+			}
+		}
+
+		synchronized(MainActivity.this) {
+			for(OverlayText overlay: overlays) overlay.show();
+		}
 	}
 
 	public void onKeyEvent(KeyEvent e) {
@@ -75,6 +86,14 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 
 		spaceMenu = new SpaceMenu(global);
 		scene = new Collection(cube1, cube2, pointer, spaceMenu);
+
+		overlays = new OverlayText[] {
+			new OverlayText(global, "Use center key to enable 3D cursor.", -0.02f, 0.01f),
+			new OverlayText(global, "Use up/down to shift cursor distance.", -0.02f, 0.005f),
+			new OverlayText(global, "Hold cursor still to activate.", -0.02f, 0),
+			new OverlayText(global, "Click touchpad again to exit.", -0.02f, -0.005f)
+		};
+		for(OverlayText overlay: overlays) scene.add(overlay);
 
 		setupMenu();
 	}

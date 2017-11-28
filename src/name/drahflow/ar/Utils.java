@@ -210,7 +210,7 @@ abstract public class Utils {
 	}
 
 	// Returns a static textureId (which receiver must not delete)
-	static class TextInfo {
+	public static class TextInfo {
 		public int texture;
 		public float width;
 		public float height;

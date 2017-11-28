@@ -69,6 +69,10 @@ public class Menu {
 		renderer = new Renderer();
 	}
 
+	protected void draw(Renderer r) {
+		// add global elements in subclasses if desired
+	}
+
 	abstract static class Element {
 		float x, y, s;
 		String title;
@@ -224,6 +228,8 @@ public class Menu {
 
 		private final float[] MOUSE = new float[] { 0.7f, 0.7f, 0.7f, 0f };
 		private void drawScene() {
+			Menu.this.draw(this);
+
 			for(Element e: menuElements) {
 				e.draw(this);
 			}
