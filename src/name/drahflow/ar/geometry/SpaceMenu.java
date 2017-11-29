@@ -187,11 +187,11 @@ public class SpaceMenu implements Geometry {
 		for(float a = 0; a < 2 * Math.PI - 0.0001; a += Math.PI / 3) {
 			final float b = (float)(a + Math.PI / 3);
 
-			lines.add((float)(Math.sqrt(3) / 2 * (Math.cos(a) + Math.cos(b)) / 2));
-			lines.add((float)(Math.sqrt(3) / 2 * -(Math.sin(a) + Math.sin(b)) / 2));
+			lines.add((float)((Math.cos(a) + Math.cos(b)) / 2));
+			lines.add((float)(-(Math.sin(a) + Math.sin(b)) / 2));
 			lines.add((float)(0));
-			lines.add((float)((1 + Math.sqrt(3) / 2) * (Math.cos(a) + Math.cos(b)) / 2));
-			lines.add((float)((1 + Math.sqrt(3) / 2) * -(Math.sin(a) + Math.sin(b)) / 2));
+			lines.add((float)((1 + 2 / Math.sqrt(3)) * (Math.cos(a) + Math.cos(b)) / 2));
+			lines.add((float)((1 + 2 / Math.sqrt(3)) * -(Math.sin(a) + Math.sin(b)) / 2));
 			lines.add((float)(0));
 		}
 
@@ -199,8 +199,8 @@ public class SpaceMenu implements Geometry {
 		for(float a = 0; a < 2 * Math.PI - 0.0001; a += Math.PI / 3) {
 			final float b = (float)(a + Math.PI / 3);
 
-			final float cx = (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(a) + Math.cos(b)) / 2);
-			final float cy = (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(a) + Math.sin(b)) / 2);
+			final float cx = (float)((2 + 2 / Math.sqrt(3)) * (Math.cos(a) + Math.cos(b)) / 2);
+			final float cy = (float)((2 + 2 / Math.sqrt(3)) * -(Math.sin(a) + Math.sin(b)) / 2);
 
 			// hexagon line
 			for(float c = 0; c < 2 * Math.PI - 0.0001; c += Math.PI / 3) {
@@ -218,11 +218,11 @@ public class SpaceMenu implements Geometry {
 			for(float c = (float)(a + 4 * Math.PI / 3); c < a + 9 * Math.PI / 3 - 0.0001; c += Math.PI / 3) {
 				final float d = (float)(c + Math.PI / 3);
 
-				lines.add((float)(cx + Math.sqrt(3) / 2 * (Math.cos(c) + Math.cos(d)) / 2));
-				lines.add((float)(cy + Math.sqrt(3) / 2 * -(Math.sin(c) + Math.sin(d)) / 2));
+				lines.add((float)(cx + (Math.cos(c) + Math.cos(d)) / 2));
+				lines.add((float)(cy + -(Math.sin(c) + Math.sin(d)) / 2));
 				lines.add((float)(0));
-				lines.add((float)(cx + (1 + Math.sqrt(3) / 2) * (Math.cos(c) + Math.cos(d)) / 2));
-				lines.add((float)(cy + (1 + Math.sqrt(3) / 2) * -(Math.sin(c) + Math.sin(d)) / 2));
+				lines.add((float)(cx + (1 + 2 / Math.sqrt(3)) * (Math.cos(c) + Math.cos(d)) / 2));
+				lines.add((float)(cy + (1 + 2 / Math.sqrt(3)) * -(Math.sin(c) + Math.sin(d)) / 2));
 				lines.add((float)(0));
 			}
 		}
