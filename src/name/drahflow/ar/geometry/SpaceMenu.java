@@ -24,6 +24,18 @@ public class SpaceMenu implements Geometry {
 
 	private static final long ACTIVATION_TIME = 250 * MILLISECOND;
 	private static final long OPEN_TIME = 750 * MILLISECOND;
+	private static final float TEXT_SCALE = 80;
+	private static final float MAINMENU_ALIGN[] = {
+		1, 0, -1, -1, 0, 1
+	};
+	private static final float SUBMENU_ALIGN[] = {
+		1, 1, 1, 0, -1,
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0
+	};
 
 	private GlobalState global;
 
@@ -91,8 +103,8 @@ public class SpaceMenu implements Geometry {
 				for(float a = 0; a < 2 * Math.PI - 0.0001; a += Math.PI / 3) {
 					final float b = (float)(a + Math.PI / 3);
 
-					final float cx = (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(a) + Math.cos(b)) / 2);
-					final float cy = (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(a) + Math.sin(b)) / 2);
+					final float cx = (float)((2 + 2 / Math.sqrt(3)) * (Math.cos(a) + Math.cos(b)) / 2);
+					final float cy = (float)((2 + 2 / Math.sqrt(3)) * -(Math.sin(a) + Math.sin(b)) / 2);
 
 					final float subDist = distance(x + SPHERE_SIZE * cx - e.x, y + SPHERE_SIZE * cy - e.y, z - e.z);
 					if(subDist < SPHERE_SIZE) {
@@ -103,15 +115,15 @@ public class SpaceMenu implements Geometry {
 			} else if(activeHexagon > 0) {
 				final float a = (float)((activeHexagon - 1) * Math.PI / 3);
 				final float b = (float)(a + Math.PI / 3);
-				final float cx = (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(a) + Math.cos(b)) / 2);
-				final float cy = (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(a) + Math.sin(b)) / 2);
+				final float cx = (float)((2 + 2 / Math.sqrt(3)) * (Math.cos(a) + Math.cos(b)) / 2);
+				final float cy = (float)((2 + 2 / Math.sqrt(3)) * -(Math.sin(a) + Math.sin(b)) / 2);
 
 				int actionIndex = 0;
 				for(float c = (float)(a + 4 * Math.PI / 3); c < a + 9 * Math.PI / 3 - 0.0001; c += Math.PI / 3) {
 					final float d = (float)(c + Math.PI / 3);
 
-					final float dx = cx + (float)((1 + 2 * Math.sqrt(3) / 2) * (Math.cos(c) + Math.cos(d)) / 2);
-					final float dy = cy + (float)((1 + 2 * Math.sqrt(3) / 2) * -(Math.sin(c) + Math.sin(d)) / 2);
+					final float dx = cx + (float)((2 + 2 / Math.sqrt(3)) * (Math.cos(c) + Math.cos(d)) / 2);
+					final float dy = cy + (float)((2 + 2 / Math.sqrt(3)) * -(Math.sin(c) + Math.sin(d)) / 2);
 
 					final float subDist = distance(x + SPHERE_SIZE * dx - e.x, y + SPHERE_SIZE * dy - e.y, z - e.z);
 					if(subDist < SPHERE_SIZE) {
@@ -234,6 +246,23 @@ public class SpaceMenu implements Geometry {
 		linePositions.put(tmp).position(0);
 	}
 
+	private static FloatBuffer quadPositions;
+	static {
+		final float[] positions = {
+			-1, -1, 0,
+			 1, -1, 0,
+			 1,  1, 0,
+
+			-1,  1, 0,
+			-1, -1, 0,
+			 1,  1, 0,
+		};
+
+		quadPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
+			.order(ByteOrder.nativeOrder()).asFloatBuffer();
+		quadPositions.put(positions).position(0);
+	}
+
 	private void renderActivatedMenu(float[] vpsMatrix, long now) {
 		Matrix.setIdentityM(modelMatrix, 0);
 
@@ -294,8 +323,6 @@ public class SpaceMenu implements Geometry {
 	}
 
 	private void renderOpenMenu(float[] vpsMatrix) {
-		Matrix.setIdentityM(modelMatrix, 0);
-
 		// TODO: Abstract this away into a global shading loading / uniform setter
 
 		final int linkedShaderHandle = Utils.compileShader(getVertexShader(), getFragmentShader(),
@@ -313,6 +340,7 @@ public class SpaceMenu implements Geometry {
 		GLES20.glEnableVertexAttribArray(positionHandle);
 
 		// Model transformations
+		Matrix.setIdentityM(modelMatrix, 0);
 		Matrix.translateM(modelMatrix, 0, x, y, z);
 		float scale = SPHERE_SIZE;
 		Matrix.scaleM(modelMatrix, 0, scale, scale, scale);
@@ -328,7 +356,115 @@ public class SpaceMenu implements Geometry {
 
 		if(activeHexagon > 0) {
 			GLES20.glDrawArrays(GLES20.GL_LINES, 24 + (activeHexagon - 1) * 22, 22);
+
+			for(int i = 0; i < 5; ++i) {
+				ActionCallback action = menuActions[(activeHexagon - 1) * 5 + i];
+
+				if(action == null) continue;
+
+				final float a = (float)((activeHexagon - 1) * Math.PI / 3);
+				final float b = (float)(a + Math.PI / 3);
+
+				final float cx = (float)((2 + 2 / Math.sqrt(3)) * (Math.cos(a) + Math.cos(b)) / 2);
+				final float cy = (float)((2 + 2 / Math.sqrt(3)) * -(Math.sin(a) + Math.sin(b)) / 2);
+
+				final float c = (float)((activeHexagon + 3 + i) * Math.PI / 3);
+				final float d = (float)(c + Math.PI / 3);
+
+				final float dx = cx + (float)((1.2 + 2 / Math.sqrt(3)) * (Math.cos(c) + Math.cos(d)) / 2);
+				final float dy = cy + (float)((1.2 + 2 / Math.sqrt(3)) * -(Math.sin(c) + Math.sin(d)) / 2);
+
+				renderText(vpsMatrix, action.getTitle(), dx, dy, SUBMENU_ALIGN[(activeHexagon - 1) * 5 + i]);
+			}
+		} else {
+			for(int i = 0; i < menuTitles.length; ++i) {
+				if(menuTitles[i] == null) continue;
+
+				final float a = (float)(i * Math.PI / 3);
+				final float b = (float)(a + Math.PI / 3);
+
+				final float cx = (float)((1.2 + 2 / Math.sqrt(3)) * (Math.cos(a) + Math.cos(b)) / 2);
+				final float cy = (float)((1.2 + 2 / Math.sqrt(3)) * -(Math.sin(a) + Math.sin(b)) / 2);
+
+				renderText(vpsMatrix, menuTitles[i], cx, cy, MAINMENU_ALIGN[i]);
+			}
 		}
+	}
+
+	private void renderText(float[] vpsMatrix, String string, float tx, float ty, float alignX) {
+		final int linkedShaderHandle = Utils.compileShader(getTextVertexShader(), getTextFragmentShader(),
+				new String[] {"a_Position"});
+		Utils.noGlError();
+		final int positionHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_Position");
+		final int mvpsMatrixHandle = GLES20.glGetUniformLocation(linkedShaderHandle, "u_MVPSMatrix");
+		GLES20.glUseProgram(linkedShaderHandle);
+
+		Utils.TextInfo text = Utils.renderText(string);
+
+		Matrix.setIdentityM(modelMatrix, 0);
+		Matrix.translateM(modelMatrix, 0, x, y, z);
+		float scale = SPHERE_SIZE;
+		Matrix.scaleM(modelMatrix, 0, scale, scale, scale);
+		Matrix.translateM(modelMatrix, 0, tx + alignX * text.width / TEXT_SCALE, ty, 0);
+		Matrix.scaleM(modelMatrix, 0, text.width / TEXT_SCALE, text.height / TEXT_SCALE, 1);
+
+		Matrix.multiplyMM(mvpsMatrix, 0, vpsMatrix, 0, modelMatrix, 0);
+		GLES20.glUniformMatrix4fv(mvpsMatrixHandle, 1, false, mvpsMatrix, 0);
+		Utils.noGlError();
+
+		quadPositions.position(0);
+		Utils.noGlError();
+		GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false,
+				0, quadPositions);
+		Utils.noGlError();
+		GLES20.glEnableVertexAttribArray(positionHandle);
+		Utils.noGlError();
+
+		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, text.texture);
+		Utils.noGlError();
+		int textureHandle = GLES20.glGetUniformLocation(linkedShaderHandle , "u_Texture");
+		GLES20.glUniform1i(textureHandle, 0);
+		Utils.noGlError();
+
+		GLES20.glEnable(GLES20.GL_BLEND);
+		Utils.noGlError();
+		GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+		Utils.noGlError();
+
+		GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6);
+		Utils.noGlError();
+
+		GLES20.glDisable(GLES20.GL_BLEND);
+		Utils.noGlError();
+	}
+
+	protected String getTextVertexShader() {
+		// Define our per-pixel lighting shader.
+		final String shader =
+				"uniform mat4 u_MVPSMatrix;      \n"		// A constant representing the combined model/view/projection matrix.
+			+ "attribute vec4 a_Position;     \n"		// Per-vertex position information we will pass in.
+			+ "varying vec2 v_TexCoordinate;  \n"		// This will be passed into the fragment shader.
+
+			// The entry point for our vertex shader.
+			+ "void main()                                                \n"
+			+ "{                                                          \n"
+			+ "   gl_Position = u_MVPSMatrix * a_Position;                 \n"
+			+ "   v_TexCoordinate = vec2(1.0 + a_Position.x, 1.0 - a_Position.y) / 2.0;\n"
+			+ "}                                                          \n";
+
+		return shader;
+	}
+
+	public String getTextFragmentShader() {
+		final String shader =
+				"precision mediump float;\n" // Set the default precision to medium.
+			+ "uniform sampler2D u_Texture;\n"
+			+ "varying vec2 v_TexCoordinate;  \n"		// This will be passed into the fragment shader.
+			+ "void main() {\n"
+			+ "   gl_FragColor = vec4(1, 1, 1, texture2D(u_Texture, v_TexCoordinate).r); \n"
+			+ "}\n";
+
+		return shader;
 	}
 
 	public interface ActionCallback {

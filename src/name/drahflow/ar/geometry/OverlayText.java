@@ -31,8 +31,8 @@ public class OverlayText implements Geometry {
 		return shownAt + DISPLAY_DURATION > System.nanoTime();
 	}
 
-	private static FloatBuffer cubePositions;
-	private static FloatBuffer cubeTexCoords;
+	private static FloatBuffer quadPositions;
+	private static FloatBuffer quadTexCoords;
 
 	static {
 		final float[] positions = {
@@ -45,9 +45,9 @@ public class OverlayText implements Geometry {
 			 1,  1, 0,
 		};
 
-		cubePositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
+		quadPositions = ByteBuffer.allocateDirect(positions.length * Utils.BYTES_PER_FLOAT)
 			.order(ByteOrder.nativeOrder()).asFloatBuffer();
-		cubePositions.put(positions).position(0);
+		quadPositions.put(positions).position(0);
 
 		final float[] texCoords = {
 			// Front face
@@ -59,9 +59,9 @@ public class OverlayText implements Geometry {
 			1.0f, 0.0f,
 		};
 
-		cubeTexCoords = ByteBuffer.allocateDirect(texCoords.length * Utils.BYTES_PER_FLOAT)
+		quadTexCoords = ByteBuffer.allocateDirect(texCoords.length * Utils.BYTES_PER_FLOAT)
 			.order(ByteOrder.nativeOrder()).asFloatBuffer();
-		cubeTexCoords.put(texCoords).position(0);
+		quadTexCoords.put(texCoords).position(0);
 	}
 
 	private static float[] inversePoseMatrix = new float[16];
@@ -85,16 +85,16 @@ public class OverlayText implements Geometry {
 		final int texCoordsHandle = GLES20.glGetAttribLocation(linkedShaderHandle, "a_TexCoordinate");
 
 		// Pass in the position information
-		cubePositions.position(0);
+		quadPositions.position(0);
 		GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false,
-				0, cubePositions);
+				0, quadPositions);
 		GLES20.glEnableVertexAttribArray(positionHandle);
 
 		// Pass in the texture coordinate information
 		if(texCoordsHandle >= 0) {
-			cubeTexCoords.position(0);
+			quadTexCoords.position(0);
 			GLES20.glVertexAttribPointer(texCoordsHandle, 2, GLES20.GL_FLOAT, false,
-					0, cubeTexCoords);
+					0, quadTexCoords);
 			GLES20.glEnableVertexAttribArray(texCoordsHandle);
 		}
 

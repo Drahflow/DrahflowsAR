@@ -100,6 +100,11 @@ public class MainActivity implements ArActivity, GLSurfaceView.Renderer {
 
 	private void setupMenu() {
 		spaceMenu.setTitle(0, "VNC");
+		spaceMenu.setTitle(1, "Nothing configured");
+		spaceMenu.setTitle(2, "Nothing configured");
+		spaceMenu.setTitle(3, "Nothing configured");
+		spaceMenu.setTitle(4, "Nothing configured");
+		spaceMenu.setTitle(5, "Nothing configured");
 		spaceMenu.setAction(0, 0, new SpaceMenu.ActionCallback() {
 			@Override public String getTitle() { return "localhost:5900"; }
 			@Override public void selected(
